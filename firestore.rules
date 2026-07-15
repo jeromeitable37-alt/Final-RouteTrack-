@@ -1,0 +1,122 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function hasProfile() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isActive() {
+      return hasProfile()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true;
+    }
+
+    function isAdmin() {
+      return isActive()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    function isBootstrapAdmin() {
+      return signedIn()
+        && request.auth.token.email in ["jeromeitable37@gmail.com", "jerometable37@gmail.com"];
+    }
+
+    match /users/{userId} {
+      allow create: if signedIn()
+        && request.resource.data.uid == userId
+        && (
+          isAdmin()
+          || (
+            request.auth.uid == userId
+            && request.resource.data.email == request.auth.token.email
+            && (
+              request.resource.data.role == "staff"
+              || (isBootstrapAdmin() && request.resource.data.role == "admin")
+            )
+          )
+        );
+
+      allow read: if signedIn()
+        && (request.auth.uid == userId || isAdmin());
+
+      allow update: if isAdmin()
+        || (
+          isBootstrapAdmin()
+          && request.auth.uid == userId
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.role == "admin"
+          && request.resource.data.active == true
+        )
+        || (
+          isActive()
+          && request.auth.uid == userId
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.active == resource.data.active
+        );
+
+      allow delete: if false;
+
+      // Read-only access to records from the first personal version so the
+      // updated app can copy them into the new system-wide document register.
+      match /documents/{legacyDocumentId} {
+        allow read: if signedIn()
+          && (request.auth.uid == userId || isAdmin());
+        allow write: if false;
+
+        match /routes/{legacyRouteId} {
+          allow read: if signedIn()
+            && (request.auth.uid == userId || isAdmin());
+          allow write: if false;
+        }
+      }
+    }
+
+    match /documents/{documentId} {
+      allow create: if isActive()
+        && request.resource.data.ownerUid is string
+        && (isAdmin() || request.resource.data.ownerUid == request.auth.uid);
+
+      allow read: if isActive()
+        && (isAdmin() || resource.data.ownerUid == request.auth.uid);
+
+      allow update: if isActive()
+        && (isAdmin() || resource.data.ownerUid == request.auth.uid)
+        && request.resource.data.ownerUid == resource.data.ownerUid;
+
+      allow delete: if isActive()
+        && (isAdmin() || resource.data.ownerUid == request.auth.uid);
+
+      match /routes/{routeId} {
+        allow read: if isActive()
+          && (
+            isAdmin()
+            || get(/databases/$(database)/documents/documents/$(documentId)).data.ownerUid == request.auth.uid
+          );
+
+        allow create: if isActive()
+          && request.resource.data.documentId == documentId
+          && request.resource.data.createdByUid == request.auth.uid
+          && (
+            isAdmin()
+            || get(/databases/$(database)/documents/documents/$(documentId)).data.ownerUid == request.auth.uid
+          );
+
+        allow update: if false;
+
+        allow delete: if isActive()
+          && (
+            isAdmin()
+            || get(/databases/$(database)/documents/documents/$(documentId)).data.ownerUid == request.auth.uid
+          );
+      }
+    }
+  }
+}

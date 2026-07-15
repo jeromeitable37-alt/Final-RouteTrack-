@@ -1,0 +1,37 @@
+ROUTETRACK ENHANCED FINAL — GITHUB AND VERCEL READY
+
+This project is already FLAT. package.json, src, and public are directly in this folder.
+Do not put this project inside another project folder before uploading it.
+
+LOCAL TEST
+1. Open THIS folder in VS Code.
+2. Run: npm install
+3. Copy .env.example and rename it .env.local.
+4. Paste your Firebase values into .env.local.
+5. Run: npm run dev
+6. Open: http://localhost:3000
+
+GITHUB
+1. git init
+2. git add .
+3. git commit -m "Enhanced RouteTrack final system"
+4. git branch -M main
+5. git remote add origin YOUR_NEW_GITHUB_URL
+6. git push -u origin main
+
+VERCEL
+Framework Preset: Next.js
+Root Directory: ./
+Build Command: Default
+Output Directory: Blank / Default
+Install Command: Default
+Add every NEXT_PUBLIC_FIREBASE_* variable before Deploy.
+
+FIRST ADMIN EMAIL
+jeromeitable37@gmail.com
+
+IMPORTANT
+- Publish the included firestore.rules.
+- .env.local is excluded from GitHub.
+- Run npm install before npm run dev.
+- Record a route before releasing each physical document.

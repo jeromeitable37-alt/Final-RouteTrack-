@@ -1,0 +1,14 @@
+GITHUB / VERCEL DEPLOYMENT
+
+1. Extract the ZIP.
+2. Open the extracted folder. package.json, src, and public must be directly visible.
+3. Create a new empty GitHub repository.
+4. Run git init, git add ., git commit, add the remote, and git push.
+5. Confirm package.json is directly visible on the first GitHub repository page.
+6. Import that repository in Vercel.
+7. Use Framework Preset Next.js and Root Directory ./.
+8. Leave Build, Install, and Output settings on their defaults; Output Directory must remain blank.
+9. Add the Firebase environment variables.
+10. Deploy.
+
+The production build was tested with the homepage route /.
