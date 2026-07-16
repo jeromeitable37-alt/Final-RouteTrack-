@@ -31,6 +31,14 @@ const STATUS_OPTIONS = [
   "Missing",
 ];
 
+const PURCHASING_EMPLOYEES = [
+  "Leah Buhay",
+  "JC Campit",
+  "EJ Aliermo",
+  "Ruel Balanlayos",
+  "Jessa Ariscon",
+];
+
 function baseDocument(): DocumentInput {
   return {
     type: "PRF",
@@ -462,20 +470,17 @@ export function DocumentForm({
 
         {isCrf && (
           <>
-            <label>
-              Purchasing employee / requisitioner
-
-              <input
-                value={form.purchasingEmployee || ""}
-                onChange={(event) =>
-                  update(
-                    "purchasingEmployee",
-                    event.target.value
-                  )
-                }
-                required
-              />
-            </label>
+            <SmartInput
+              label="Purchasing employee / requisitioner"
+              value={form.purchasingEmployee || ""}
+              options={PURCHASING_EMPLOYEES}
+              onChange={(value) =>
+                update("purchasingEmployee", value)
+              }
+              placeholder="Choose or type an employee"
+              required
+              help="Select an employee from the list or type another name."
+            />
 
             <label>
               CRF date
