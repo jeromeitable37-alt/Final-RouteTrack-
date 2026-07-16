@@ -43,7 +43,7 @@ import {
   SessionUser,
   UserProfile,
 } from "@/lib/types";
-import { csvDownload, formatCurrency, formatDateTime, isClosed, statusClass } from "@/lib/utils";
+import { csvDownload, formatCurrency, formatDateTime, statusClass } from "@/lib/utils";
 import { Modal } from "./Modal";
 import { DocumentForm } from "./DocumentForm";
 import { DocumentDetails } from "./DocumentDetails";
@@ -55,6 +55,10 @@ type View = "dashboard" | "documents" | "routes" | "alerts" | "users" | "profile
 
 function isAdminRole(role: unknown): boolean {
   return String(role || "").trim().toLowerCase() === "admin";
+}
+
+function normalizeStatus(status: unknown): string {
+  return String(status || "").trim().toLowerCase();
 }
 
 export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogout: () => void }) {
@@ -117,9 +121,18 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
     return acc;
   }, {}), [documents]);
 
-  const missing = documents.filter((item) => item.status === "Missing");
-  const active = documents.filter((item) => !isClosed(item.status));
-  const completed = documents.filter((item) => item.status === "Completed");
+  const missing = documents.filter(
+    (item) => normalizeStatus(item.status) === "missing"
+  );
+
+  const completed = documents.filter(
+    (item) => normalizeStatus(item.status) === "completed"
+  );
+
+  const active = documents.filter((item) => {
+    const status = normalizeStatus(item.status);
+    return status !== "completed" && status !== "cancelled";
+  });
   const routingDocuments = [...documents].filter((item) => item.lastRoutedAt).sort((a, b) => String(b.lastRoutedAt).localeCompare(String(a.lastRoutedAt)));
   const unacknowledged = routingDocuments.filter((item) => {
     if (!item.lastRoutedAt || item.lastReceivedBy || item.lastReceivedAt) return false;
@@ -133,7 +146,10 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
     const haystack = `${item.type} ${item.requestNo} ${item.organization || ""} ${item.currentHolder} ${item.purchasingEmployee || item.requestor} ${item.supplier || ""} ${item.itemsDescription || item.subjectPurpose} ${owner?.displayName || item.ownerName}`.toLowerCase();
     return haystack.includes(search.toLowerCase())
       && (typeFilter === "All" || item.type === typeFilter)
-      && (statusFilter === "All" || item.status === statusFilter);
+      && (
+        statusFilter === "All"
+        || normalizeStatus(item.status) === normalizeStatus(statusFilter)
+      );
   });
 
   const filteredRoutes = routingDocuments.filter((item) => {
@@ -315,7 +331,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
 
         {view === "routes" && <div className="page-section"><section className="routing-explainer"><div><p className="eyebrow">CHAIN OF CUSTODY</p><h2>Each handoff keeps the exact date, time, person, and office.</h2><p>Open any record to add the next route or check the complete history.</p></div><Clock3 size={42} /></section><section className="panel"><Filters search={search} setSearch={setSearch} typeFilter={typeFilter} setTypeFilter={setTypeFilter} onExport={exportRoutes} /><RoutingTable documents={filteredRoutes} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={isAdmin} userMap={userMap} /></section></div>}
 
-        {view === "alerts" && <div className="page-section"><section className="alert-summary-grid"><MiniMetric label="Missing" value={missing.length} /><MiniMetric label="No acknowledgment" value={unacknowledged.length} /><MiniMetric label="Duplicate numbers" value={duplicates.length} /></section><section className="panel"><div className="panel-heading"><h2>Documents needing follow-up</h2></div>{alerts.length ? <div className="alert-card-grid">{alerts.map((item) => <button className="alert-card" key={item.id} onClick={() => setSelectedId(item.id)}><div className="alert-icon"><AlertTriangle size={20} /></div><div><strong>{item.type} {item.requestNo}</strong><span>Current: {item.currentHolder}</span><p>{item.status === "Missing" ? "Marked missing" : unacknowledged.some((route) => route.id === item.id) ? "No acknowledgment after one day" : "Duplicate number"}</p></div></button>)}</div> : <div className="empty-panel success-empty">No routing exceptions detected.</div>}</section></div>}
+        {view === "alerts" && <div className="page-section"><section className="alert-summary-grid"><MiniMetric label="Missing" value={missing.length} /><MiniMetric label="No acknowledgment" value={unacknowledged.length} /><MiniMetric label="Duplicate numbers" value={duplicates.length} /></section><section className="panel"><div className="panel-heading"><h2>Documents needing follow-up</h2></div>{alerts.length ? <div className="alert-card-grid">{alerts.map((item) => <button className="alert-card" key={item.id} onClick={() => setSelectedId(item.id)}><div className="alert-icon"><AlertTriangle size={20} /></div><div><strong>{item.type} {item.requestNo}</strong><span>Current: {item.currentHolder}</span><p>{normalizeStatus(item.status) === "missing" ? "Marked missing" : unacknowledged.some((route) => route.id === item.id) ? "No acknowledgment after one day" : "Duplicate number"}</p></div></button>)}</div> : <div className="empty-panel success-empty">No routing exceptions detected.</div>}</section></div>}
 
         {view === "users" && isAdmin && <div className="page-section"><section className="metric-grid user-metric-grid"><Metric label="Total accounts" value={users.length} note="Registered profiles" /><Metric label="Active" value={users.filter((item) => item.active).length} note="Can use the system" positive /><Metric label="Administrators" value={users.filter((item) => isAdminRole(item.role)).length} note="Full access" /><Metric label="Disabled" value={users.filter((item) => !item.active).length} note="Access blocked" alert={users.some((item) => !item.active)} /></section><section className="panel"><div className="user-toolbar"><div className="search-box"><Search size={18} /><input placeholder="Search name, department, position…" value={userSearch} onChange={(event) => setUserSearch(event.target.value)} /></div><button className="primary-button" onClick={newUser}><UserPlus size={17} /> Create account</button></div><UserTable users={filteredUsers} currentUid={user.uid} documentCounts={documents.reduce<Record<string, number>>((acc, item) => { acc[item.ownerUid] = (acc[item.ownerUid] || 0) + 1; return acc; }, {})} onEdit={editUser} /></section></div>}
 
