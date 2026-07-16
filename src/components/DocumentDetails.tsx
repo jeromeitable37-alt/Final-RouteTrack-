@@ -26,7 +26,16 @@ export function DocumentDetails({ user, document, onEdit, onDelete, notify }: {
     return () => unsubscribe();
   }, [document.id, document.ownerUid]);
 
+  const isCrf = document.type === "CRF";
+  const isPo = document.type === "PO";
+  const isSingleRouteDocument = isCrf || isPo;
+
   async function saveRoute(input: RoutingInput) {
+    if (isSingleRouteDocument) {
+      notify(`${document.type} is already Completed. No additional routing is required.`, true);
+      return;
+    }
+
     try {
       await addRoute(user, document.id, input);
       const status = input.movementStatus === "Received"
@@ -57,16 +66,15 @@ export function DocumentDetails({ user, document, onEdit, onDelete, notify }: {
     }
   }
 
-  const isCrf = document.type === "CRF";
-  const isPo = document.type === "PO";
-
   return (
     <>
       <div className="detail-toolbar no-print">
         <button className="secondary-button" onClick={() => window.print()}><Printer size={16} /> Print</button>
         <button className="secondary-button" onClick={onEdit}><Edit3 size={16} /> Edit</button>
         <button className="danger-button" onClick={onDelete}><Trash2 size={16} /> Delete</button>
-        <button className="primary-button" onClick={() => setRoutingOpen(true)}><Plus size={16} /> Route next</button>
+        {!isSingleRouteDocument && (
+          <button className="primary-button" onClick={() => setRoutingOpen(true)}><Plus size={16} /> Route next</button>
+        )}
       </div>
 
       <section className="print-sheet">
@@ -91,6 +99,12 @@ export function DocumentDetails({ user, document, onEdit, onDelete, notify }: {
         </div>
 
         <div className="current-location"><MapPin size={20} /><div><span>Current holder / office</span><strong>{document.currentHolder}</strong></div></div>
+        {isSingleRouteDocument && (
+          <div className="remarks-box">
+            <span>Routing status</span>
+            <p>{document.type} is completed after its first routing entry. No Route next action is required.</p>
+          </div>
+        )}
         {(document.itemsDescription || document.subjectPurpose) && <div className="remarks-box"><span>Description / items</span><p>{document.itemsDescription || document.subjectPurpose}</p></div>}
         {document.remarks && <div className="remarks-box"><span>Remarks</span><p>{document.remarks}</p></div>}
 
@@ -98,7 +112,7 @@ export function DocumentDetails({ user, document, onEdit, onDelete, notify }: {
         {routes.length ? <div className="timeline">{routes.map((route) => <article className="timeline-item" key={route.id}><div className="timeline-dot" /><div className="timeline-card"><div className="route-line"><strong>{route.fromOffice}</strong><ArrowRight size={16} /><strong>{route.toOffice}</strong></div><p>{route.actionPurpose}</p><div className="route-meta"><span>Routed: {formatDateTime(route.dateTimeRouted)}</span><span>Status: {route.movementStatus}</span><span>Received by: {route.receivedBy || "No acknowledgment"}</span><span>Received: {formatDateTime(route.dateTimeReceived)}</span><span>Encoded by: {route.createdByName || "User"}</span></div>{route.proofReference && <p className="proof-ref">Proof: {route.proofReference}</p>}{route.remarks && <p className="muted">{route.remarks}</p>}</div></article>)}</div> : <div className="empty-panel">No routing history yet.</div>}
       </section>
 
-      {routingOpen && <Modal title="Record next handoff" onClose={() => setRoutingOpen(false)}><RoutingForm document={document} onSubmit={saveRoute} onCancel={() => setRoutingOpen(false)} /></Modal>}
+      {!isSingleRouteDocument && routingOpen && <Modal title="Record next handoff" onClose={() => setRoutingOpen(false)}><RoutingForm document={document} onSubmit={saveRoute} onCancel={() => setRoutingOpen(false)} /></Modal>}
     </>
   );
 }

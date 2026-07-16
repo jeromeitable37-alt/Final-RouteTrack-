@@ -116,8 +116,8 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
   const selected = selectedId ? documents.find((item) => item.id === selectedId) || null : null;
 
   const requestCounts = useMemo(() => documents.reduce<Record<string, number>>((acc, item) => {
-    const key = `${item.type}:${item.requestNo.trim().toLowerCase()}`;
-    if (item.requestNo.trim()) acc[key] = (acc[key] || 0) + 1;
+    const key = item.requestNo.trim().toLowerCase();
+    if (key) acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {}), [documents]);
 
@@ -138,7 +138,9 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
     if (!item.lastRoutedAt || item.lastReceivedBy || item.lastReceivedAt) return false;
     return Date.now() - new Date(item.lastRoutedAt).getTime() > 86_400_000;
   });
-  const duplicates = documents.filter((item) => requestCounts[`${item.type}:${item.requestNo.trim().toLowerCase()}`] > 1);
+  const duplicates = documents.filter(
+    (item) => requestCounts[item.requestNo.trim().toLowerCase()] > 1
+  );
   const alerts = [...new Map([...missing, ...unacknowledged, ...duplicates].map((item) => [item.id, item])).values()];
 
   const filteredDocuments = documents.filter((item) => {
@@ -173,12 +175,15 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
         notify("Document information updated.");
       } else {
         const owner = userMap.get(ownerUid) || user;
+        const automaticallyCompleted =
+          submission.document.type === "CRF" ||
+          submission.document.type === "PO";
         const id = await addDocument(owner, submission.document);
         await addRoute(user, id, submission.initialRoute);
         await updateDocument(id, {
           routeCount: 1,
           currentHolder: submission.initialRoute.toOffice,
-          status: "In Transit",
+          status: automaticallyCompleted ? "Completed" : "In Transit",
           lastRoutedAt: submission.initialRoute.dateTimeRouted,
           lastFromOffice: submission.initialRoute.fromOffice,
           lastToOffice: submission.initialRoute.toOffice,
@@ -189,7 +194,11 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
           lastRouteEncodedBy: user.displayName || user.email,
           lastProofReference: submission.initialRoute.proofReference,
         });
-        notify("Document and first routing entry saved.");
+        notify(
+          automaticallyCompleted
+            ? `${submission.document.type} recorded and marked Completed. No additional routing is required.`
+            : "Document and first routing entry saved. Status: In Transit."
+        );
       }
       setFormOpen(false);
       setEditing(null);
@@ -365,7 +374,7 @@ function DocumentTable({ documents, loading, onOpen, showOwner = false, userMap,
 }) {
   if (loading) return <div className="loading-panel">Loading records…</div>;
   if (!documents.length) return <div className="empty-panel">No documents found. Use Quick log to add your first record.</div>;
-  return <div className="table-wrap"><table className={showOwner ? "admin-document-table" : ""}><thead><tr><th>Document</th>{showOwner && <th>Recorded by</th>}<th>Routed date</th><th>Current holder</th><th>Requester / supplier</th><th>Amount / terms</th><th>Status</th></tr></thead><tbody>{documents.map((item) => { const owner = userMap.get(item.ownerUid); const duplicate = requestCounts[`${item.type}:${item.requestNo.trim().toLowerCase()}`] > 1; return <tr key={item.id} onClick={() => onOpen(item)}><td><strong>{item.type} {item.requestNo}</strong><span>{item.organization || "No organization"}{duplicate ? " · Duplicate" : ""}</span></td>{showOwner && <td><strong>{owner?.displayName || item.ownerName}</strong><span>{owner?.department || item.ownerEmail}</span></td>}<td>{formatDateTime(item.lastRoutedAt || item.createdAt)}</td><td><strong>{item.currentHolder}</strong><span>{item.lastRoutePurpose || ""}</span></td><td><strong>{item.purchasingEmployee || item.requestor || "—"}</strong><span>{item.supplier || ""}</span></td><td><strong>{item.amount ? formatCurrency(item.amount) : "—"}</strong><span>{item.paymentTerms || ""}</span></td><td><span className={statusClass(item.status)}>{item.status}</span></td></tr>; })}</tbody></table></div>;
+  return <div className="table-wrap"><table className={showOwner ? "admin-document-table" : ""}><thead><tr><th>Document</th>{showOwner && <th>Recorded by</th>}<th>Routed date</th><th>Current holder</th><th>Requester / supplier</th><th>Amount / terms</th><th>Status</th></tr></thead><tbody>{documents.map((item) => { const owner = userMap.get(item.ownerUid); const duplicate = requestCounts[item.requestNo.trim().toLowerCase()] > 1; return <tr key={item.id} onClick={() => onOpen(item)}><td><strong>{item.type} {item.requestNo}</strong><span>{item.organization || "No organization"}{duplicate ? " · Duplicate" : ""}</span></td>{showOwner && <td><strong>{owner?.displayName || item.ownerName}</strong><span>{owner?.department || item.ownerEmail}</span></td>}<td>{formatDateTime(item.lastRoutedAt || item.createdAt)}</td><td><strong>{item.currentHolder}</strong><span>{item.lastRoutePurpose || ""}</span></td><td><strong>{item.purchasingEmployee || item.requestor || "—"}</strong><span>{item.supplier || ""}</span></td><td><strong>{item.amount ? formatCurrency(item.amount) : "—"}</strong><span>{item.paymentTerms || ""}</span></td><td><span className={statusClass(item.status)}>{item.status}</span></td></tr>; })}</tbody></table></div>;
 }
 
 function RoutingTable({ documents, loading, onOpen, showOwner = false, userMap = new Map() }: {

@@ -283,14 +283,15 @@ export function DocumentForm({
 
   const normalized = form.requestNo.trim().toLowerCase();
 
-  const duplicate =
-    Boolean(normalized) &&
-    existingDocuments.some(
-      (item) =>
-        item.id !== document?.id &&
-        item.type === form.type &&
-        item.requestNo.trim().toLowerCase() === normalized
-    );
+  const duplicateDocument = Boolean(normalized)
+    ? existingDocuments.find(
+        (item) =>
+          item.id !== document?.id &&
+          item.requestNo.trim().toLowerCase() === normalized
+      )
+    : undefined;
+
+  const duplicate = Boolean(duplicateDocument);
 
   const isCrf = form.type === "CRF";
   const isPo = form.type === "PO";
@@ -454,9 +455,14 @@ export function DocumentForm({
         dateLogged: dateTimeRouted.slice(0, 10),
         currentHolder: routeTo.trim(),
 
-        // New documents automatically start as In Transit.
-        // Existing documents keep the selected status.
-        status: document ? form.status : "In Transit",
+        // CRF and PO are completed after the first routing entry.
+        // PRF and SRF remain active until manually completed.
+        status:
+          form.type === "CRF" || form.type === "PO"
+            ? "Completed"
+            : document
+              ? form.status
+              : "In Transit",
       };
 
       await onSubmit({
@@ -496,7 +502,9 @@ export function DocumentForm({
         </div>
 
         <span>
-          Only the fields marked required must be completed.
+          {isCrf || isPo
+            ? `${form.type} will be marked Completed after saving. No additional routing is required.`
+            : "Only the fields marked required must be completed."}
         </span>
       </section>
 
@@ -559,9 +567,11 @@ export function DocumentForm({
             required
           />
 
-          {duplicate && (
+          {duplicate && duplicateDocument && (
             <span className="field-error">
-              This document number already exists.
+              This number is already used by {duplicateDocument.type}{" "}
+              {duplicateDocument.requestNo}. Every PRF, SRF, CRF, and PO
+              number must be unique.
             </span>
           )}
         </label>
@@ -859,7 +869,7 @@ export function DocumentForm({
       )}
 
       <div className="form-grid form-bottom-fields">
-        {document && (
+        {document && !isCrf && !isPo && (
           <label className="span-2">
             Document status
 
@@ -885,6 +895,16 @@ export function DocumentForm({
           </label>
         )}
 
+        {(isCrf || isPo) && (
+          <div className="span-2">
+            <strong>Document status: Completed</strong>
+            <p className="field-help">
+              {form.type} is closed after this routing entry. There is no
+              Route next step.
+            </p>
+          </div>
+        )}
+
         <label className="span-2">
           Remarks
 
@@ -904,10 +924,15 @@ export function DocumentForm({
           className="form-validation-summary"
           role="alert"
         >
-          {duplicate ? (
-            <strong>
-              A {form.type} with this number already exists.
-            </strong>
+          {duplicate && duplicateDocument ? (
+            <>
+              <strong>Unable to save: duplicate document number.</strong>
+              <span>
+                {duplicateDocument.type} {duplicateDocument.requestNo} already
+                uses this number. Enter a unique number for all PRF, SRF, CRF,
+                and PO records.
+              </span>
+            </>
           ) : (
             <>
               <strong>
