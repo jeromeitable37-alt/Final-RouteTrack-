@@ -23,6 +23,8 @@ export type MovementStatus = (typeof MOVEMENT_STATUSES)[number];
 export const USER_ROLES = ["admin", "staff"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
+export type RouteEventType = "route" | "acknowledgment" | "status";
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -87,11 +89,26 @@ export interface DocumentRecord {
   lastMovementStatus?: MovementStatus;
   lastRouteEncodedBy?: string;
   lastProofReference?: string;
+  routeSearchText?: string;
+  completedAt?: string;
+  archivedAt?: string;
+  archivedBy?: string;
 }
 
 export type DocumentInput = Omit<
   DocumentRecord,
-  "id" | "trackingId" | "ownerUid" | "ownerName" | "ownerEmail" | "routeCount" | "createdAt" | "updatedAt"
+  | "id"
+  | "trackingId"
+  | "ownerUid"
+  | "ownerName"
+  | "ownerEmail"
+  | "routeCount"
+  | "createdAt"
+  | "updatedAt"
+  | "routeSearchText"
+  | "completedAt"
+  | "archivedAt"
+  | "archivedBy"
 >;
 
 export interface RoutingRecord {
@@ -105,17 +122,35 @@ export interface RoutingRecord {
   dateTimeReceived: string;
   movementStatus: MovementStatus;
   proofReference: string;
+  proofPhotoDataUrl?: string;
+  receiverConfirmation?: string;
+  eventType?: RouteEventType;
   remarks: string;
   createdAt: string;
   createdByUid: string;
   createdByName: string;
 }
 
-export type RoutingInput = Omit<RoutingRecord, "id" | "documentId" | "createdAt" | "createdByUid" | "createdByName">;
+export type RoutingInput = Omit<
+  RoutingRecord,
+  "id" | "documentId" | "createdAt" | "createdByUid" | "createdByName"
+>;
 
 export interface DocumentSubmission {
   document: DocumentInput;
   initialRoute: RoutingInput;
+}
+
+export interface ActivityRecord {
+  id: string;
+  actorUid: string;
+  actorName: string;
+  actorEmail: string;
+  action: string;
+  summary: string;
+  documentId?: string;
+  documentLabel?: string;
+  createdAt: string;
 }
 
 export interface SessionUser extends UserProfile {

@@ -52,6 +52,74 @@ export const ROUTE_PURPOSES = [
   "For filing / records",
 ] as const;
 
+export interface RoutingTemplate {
+  id: string;
+  label: string;
+  type: DocumentType;
+  organization: string;
+  destination: string;
+  purpose: string;
+}
+
+export const ROUTING_TEMPLATES: RoutingTemplate[] = [
+  {
+    id: "prf-sisc",
+    label: "PRF — SISC",
+    type: "PRF",
+    organization: "SISC",
+    destination: "Ms. Jorge Balela — Admin / Budget Owner",
+    purpose: "First signature / budget owner approval",
+  },
+  {
+    id: "prf-non-sisc",
+    label: "PRF — Non-SISC",
+    type: "PRF",
+    organization: "Other",
+    destination: "Ms. Jorge Balela — Admin / Budget Owner",
+    purpose: "First signature / budget owner approval",
+  },
+  {
+    id: "srf-sisc",
+    label: "SRF — SISC",
+    type: "SRF",
+    organization: "SISC",
+    destination: "Ms. Jorge Balela — Admin / Budget Owner",
+    purpose: "First signature / budget owner approval",
+  },
+  {
+    id: "srf-non-sisc",
+    label: "SRF — Non-SISC",
+    type: "SRF",
+    organization: "Other",
+    destination: "Ms. Jorge Balela — Admin / Budget Owner",
+    purpose: "First signature / budget owner approval",
+  },
+  {
+    id: "crf-sisc",
+    label: "CRF — SISC / SO / 10 series",
+    type: "CRF",
+    organization: "SISC",
+    destination: "Sir Marc Marquez — Treasury / Accounting",
+    purpose: "Treasury / accounting approval",
+  },
+  {
+    id: "crf-non-sisc",
+    label: "CRF — TREX / Tropical Palms / ASAT / ACTS / Other",
+    type: "CRF",
+    organization: "Other",
+    destination: "Ms. Lorie — Accounting / Treasury (Non-SISC)",
+    purpose: "Treasury / accounting approval",
+  },
+  {
+    id: "po-supplier",
+    label: "PO — Forward to supplier",
+    type: "PO",
+    organization: "SISC",
+    destination: "Supplier / Vendor",
+    purpose: "Forwarded to supplier",
+  },
+];
+
 export function isSiscDocument(organization: string, requestNo: string): boolean {
   const normalizedOrg = organization.trim().toLowerCase();
   const normalizedNo = requestNo.trim().toUpperCase();

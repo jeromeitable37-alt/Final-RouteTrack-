@@ -4,11 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { signOut } from "firebase/auth";
 import {
   AlertTriangle,
+  Archive,
   BarChart3,
   ClipboardList,
   Clock3,
   Download,
   FilePlus2,
+  HardDriveDownload,
+  History,
   LogOut,
   Menu,
   Plus,
@@ -23,11 +26,13 @@ import {
 } from "lucide-react";
 import { auth, firebaseConfigured } from "@/lib/firebase";
 import {
+  addActivityLog,
   addDocument,
   addRoute,
   createManagedUser,
+  getRoutes,
   migrateLegacyDocuments,
-  removeDocument,
+  subscribeActivityLogs,
   subscribeAllDocuments,
   subscribeDocuments,
   subscribeUsers,
@@ -35,6 +40,7 @@ import {
   updateManagedUser,
 } from "@/lib/data-service";
 import {
+  ActivityRecord,
   DOCUMENT_STATUSES,
   DOCUMENT_TYPES,
   DocumentRecord,
@@ -43,15 +49,16 @@ import {
   SessionUser,
   UserProfile,
 } from "@/lib/types";
-import { csvDownload, formatCurrency, formatDateTime, statusClass } from "@/lib/utils";
+import { csvDownload, formatCurrency, formatDateTime, jsonDownload, statusClass } from "@/lib/utils";
 import { Modal } from "./Modal";
 import { DocumentForm } from "./DocumentForm";
 import { DocumentDetails } from "./DocumentDetails";
 import { UserForm } from "./UserForm";
 import { ProfileForm } from "./ProfileForm";
 import { Avatar } from "./Avatar";
+import { InstallAppButton } from "./PwaSupport";
 
-type View = "dashboard" | "documents" | "routes" | "alerts" | "users" | "profile";
+type View = "dashboard" | "documents" | "routes" | "alerts" | "archive" | "activity" | "users" | "profile";
 
 function isAdminRole(role: unknown): boolean {
   return String(role || "").trim().toLowerCase() === "admin";
@@ -65,6 +72,8 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
   const isAdmin = isAdminRole(user.role);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [activities, setActivities] = useState<ActivityRecord[]>([]);
+  const [routeHistoryIndex, setRouteHistoryIndex] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -101,6 +110,42 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
     return subscribeUsers(setUsers);
   }, [isAdmin, user]);
 
+  useEffect(() => subscribeActivityLogs(user, setActivities), [user.uid, user.role]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const targets = documents.filter((item) => !item.routeSearchText);
+    if (!targets.length) {
+      setRouteHistoryIndex({});
+      return;
+    }
+    void Promise.all(targets.map(async (item) => {
+      const routes = await getRoutes(item.id);
+      const text = routes.flatMap((route) => [
+        route.fromOffice,
+        route.toOffice,
+        route.actionPurpose,
+        route.receivedBy,
+        route.proofReference,
+        route.receiverConfirmation,
+        route.createdByName,
+      ]).filter(Boolean).join(" ");
+      return [item.id, text] as const;
+    })).then((entries) => {
+      if (!cancelled) setRouteHistoryIndex(Object.fromEntries(entries));
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [documents]);
+
+  useEffect(() => {
+    if (!documents.length || typeof window === "undefined") return;
+    const requestedId = new URLSearchParams(window.location.search).get("document");
+    if (requestedId && documents.some((item) => item.id === requestedId)) {
+      setSelectedId(requestedId);
+      setView("documents");
+    }
+  }, [documents]);
+
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(null), 3200);
@@ -115,48 +160,76 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
   const activeOwnerOptions = useMemo(() => users.filter((item) => item.active), [users]);
   const selected = selectedId ? documents.find((item) => item.id === selectedId) || null : null;
 
-  const requestCounts = useMemo(() => documents.reduce<Record<string, number>>((acc, item) => {
+  const visibleDocuments = documents.filter((item) => !item.archivedAt);
+  const archivedDocuments = documents.filter((item) => Boolean(item.archivedAt));
+
+  const requestCounts = useMemo(() => visibleDocuments.reduce<Record<string, number>>((acc, item) => {
     const key = item.requestNo.trim().toLowerCase();
     if (key) acc[key] = (acc[key] || 0) + 1;
     return acc;
-  }, {}), [documents]);
+  }, {}), [visibleDocuments]);
 
-  const missing = documents.filter(
-    (item) => normalizeStatus(item.status) === "missing"
-  );
-
-  const completed = documents.filter(
-    (item) => normalizeStatus(item.status) === "completed"
-  );
-
-  const active = documents.filter((item) => {
+  const missing = visibleDocuments.filter((item) => normalizeStatus(item.status) === "missing");
+  const completed = visibleDocuments.filter((item) => normalizeStatus(item.status) === "completed");
+  const active = visibleDocuments.filter((item) => {
     const status = normalizeStatus(item.status);
     return status !== "completed" && status !== "cancelled";
   });
-  const routingDocuments = [...documents].filter((item) => item.lastRoutedAt).sort((a, b) => String(b.lastRoutedAt).localeCompare(String(a.lastRoutedAt)));
+  const routingDocuments = [...visibleDocuments]
+    .filter((item) => item.lastRoutedAt)
+    .sort((a, b) => String(b.lastRoutedAt).localeCompare(String(a.lastRoutedAt)));
   const unacknowledged = routingDocuments.filter((item) => {
+    const status = normalizeStatus(item.status);
+    if (status === "completed" || status === "cancelled") return false;
     if (!item.lastRoutedAt || item.lastReceivedBy || item.lastReceivedAt) return false;
     return Date.now() - new Date(item.lastRoutedAt).getTime() > 86_400_000;
   });
-  const duplicates = documents.filter(
-    (item) => requestCounts[item.requestNo.trim().toLowerCase()] > 1
-  );
-  const alerts = [...new Map([...missing, ...unacknowledged, ...duplicates].map((item) => [item.id, item])).values()];
+  const stalled = active.filter((item) => {
+    const last = item.lastRoutedAt || item.updatedAt || item.createdAt;
+    return Date.now() - new Date(last).getTime() > 3 * 86_400_000;
+  });
+  const duplicates = visibleDocuments.filter((item) => requestCounts[item.requestNo.trim().toLowerCase()] > 1);
+  const alerts = [...new Map([...missing, ...unacknowledged, ...stalled, ...duplicates].map((item) => [item.id, item])).values()];
 
-  const filteredDocuments = documents.filter((item) => {
+  const localToday = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+  const routedToday = routingDocuments.filter((item) => String(item.lastRoutedAt || "").slice(0, 10) === localToday);
+  const completedToday = completed.filter((item) => String(item.completedAt || item.updatedAt || "").slice(0, 10) === localToday);
+
+  function documentSearchText(item: DocumentRecord): string {
     const owner = userMap.get(item.ownerUid);
-    const haystack = `${item.type} ${item.requestNo} ${item.organization || ""} ${item.currentHolder} ${item.purchasingEmployee || item.requestor} ${item.supplier || ""} ${item.itemsDescription || item.subjectPurpose} ${owner?.displayName || item.ownerName}`.toLowerCase();
-    return haystack.includes(search.toLowerCase())
+    return [
+      item.type,
+      item.requestNo,
+      item.organization,
+      item.currentHolder,
+      item.purchasingEmployee || item.requestor,
+      item.supplier,
+      item.itemsDescription || item.subjectPurpose,
+      owner?.displayName || item.ownerName,
+      item.lastFromOffice,
+      item.lastToOffice,
+      item.lastRoutePurpose,
+      item.lastReceivedBy,
+      item.lastRouteEncodedBy,
+      item.routeSearchText,
+      routeHistoryIndex[item.id],
+    ].filter(Boolean).join(" ").toLowerCase();
+  }
+
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredDocuments = visibleDocuments.filter((item) => {
+    return documentSearchText(item).includes(normalizedSearch)
       && (typeFilter === "All" || item.type === typeFilter)
-      && (
-        statusFilter === "All"
-        || normalizeStatus(item.status) === normalizeStatus(statusFilter)
-      );
+      && (statusFilter === "All" || normalizeStatus(item.status) === normalizeStatus(statusFilter));
   });
 
+  const finderResults = normalizedSearch
+    ? visibleDocuments.filter((item) => documentSearchText(item).includes(normalizedSearch)).slice(0, 10)
+    : routingDocuments.slice(0, 6);
+
   const filteredRoutes = routingDocuments.filter((item) => {
-    const haystack = `${item.type} ${item.requestNo} ${item.organization || ""} ${item.lastFromOffice || ""} ${item.lastToOffice || ""} ${item.currentHolder} ${item.lastRoutePurpose || ""}`.toLowerCase();
-    return haystack.includes(search.toLowerCase()) && (typeFilter === "All" || item.type === typeFilter);
+    return documentSearchText(item).includes(normalizedSearch)
+      && (typeFilter === "All" || item.type === typeFilter);
   });
 
   const filteredUsers = users.filter((profile) => `${profile.displayName} ${profile.email} ${profile.department} ${profile.position || ""} ${profile.role}`.toLowerCase().includes(userSearch.toLowerCase()));
@@ -172,6 +245,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
     try {
       if (editing) {
         await updateDocument(editing.id, submission.document);
+        await addActivityLog(user, "EDITED", `${editing.type} ${editing.requestNo} information updated.`, editing);
         notify("Document information updated.");
       } else {
         const owner = userMap.get(ownerUid) || user;
@@ -184,6 +258,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
           routeCount: 1,
           currentHolder: submission.initialRoute.toOffice,
           status: automaticallyCompleted ? "Completed" : "In Transit",
+          completedAt: automaticallyCompleted ? new Date().toISOString() : "",
           lastRoutedAt: submission.initialRoute.dateTimeRouted,
           lastFromOffice: submission.initialRoute.fromOffice,
           lastToOffice: submission.initialRoute.toOffice,
@@ -193,6 +268,16 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
           lastMovementStatus: submission.initialRoute.movementStatus,
           lastRouteEncodedBy: user.displayName || user.email,
           lastProofReference: submission.initialRoute.proofReference,
+          routeSearchText: [
+            submission.initialRoute.fromOffice,
+            submission.initialRoute.toOffice,
+            submission.initialRoute.actionPurpose,
+          ].join(" "),
+        });
+        await addActivityLog(user, "CREATED", `${submission.document.type} ${submission.document.requestNo} recorded and routed to ${submission.initialRoute.toOffice}.`, {
+          id,
+          type: submission.document.type,
+          requestNo: submission.document.requestNo,
         });
         notify(
           automaticallyCompleted
@@ -204,17 +289,6 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
       setEditing(null);
     } catch (caught) {
       notify(caught instanceof Error ? caught.message : "Unable to save the document.", true);
-    }
-  }
-
-  async function deleteSelected(document: DocumentRecord) {
-    if (!window.confirm(`Delete ${document.type} ${document.requestNo}? This cannot be undone.`)) return;
-    try {
-      await removeDocument(document.id);
-      setSelectedId(null);
-      notify("Document deleted.");
-    } catch {
-      notify("Unable to delete the document.", true);
     }
   }
 
@@ -234,9 +308,11 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
           role: input.role,
           active: input.active,
         });
+        await addActivityLog(user, "USER_UPDATED", `${input.displayName} account updated.`);
         notify("User account updated.");
       } else {
         await createManagedUser(input);
+        await addActivityLog(user, "USER_CREATED", `${input.displayName} account created.`);
         notify("New user account created.");
       }
       setUserFormOpen(false);
@@ -250,6 +326,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
   async function saveProfile(changes: Partial<UserProfile>) {
     try {
       await updateManagedUser(user.uid, changes);
+      await addActivityLog(user, "PROFILE_UPDATED", "Profile information updated.");
       notify("Profile updated.");
     } catch {
       notify("Unable to update your profile.", true);
@@ -291,12 +368,35 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
     })));
   }
 
+  async function exportBackup() {
+    try {
+      const routeEntries = await Promise.all(documents.map(async (item) => ({
+        documentId: item.id,
+        label: `${item.type} ${item.requestNo}`,
+        routes: await getRoutes(item.id),
+      })));
+      jsonDownload(`routetrack-backup-${localToday}.json`, {
+        exportedAt: new Date().toISOString(),
+        exportedBy: user.email,
+        documents,
+        users: isAdmin ? users : [user],
+        routes: routeEntries,
+        activities,
+      });
+      notify("Backup downloaded.");
+    } catch {
+      notify("Unable to prepare the backup.", true);
+    }
+  }
+
   const viewTitle = view === "dashboard" ? (isAdmin ? "Administrator dashboard" : "My routing dashboard")
     : view === "documents" ? "Document register"
       : view === "routes" ? "Routing history"
         : view === "alerts" ? "Documents to check"
-          : view === "users" ? "User management"
-            : "My profile";
+          : view === "archive" ? "Archived documents"
+            : view === "activity" ? "Activity log"
+              : view === "users" ? "User management"
+                : "My profile";
 
   return (
     <div className="app-layout">
@@ -305,9 +405,11 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
         {isAdmin && <div className="admin-sidebar-badge"><ShieldCheck size={15} /> Administrator</div>}
         <nav>
           <button className={view === "dashboard" ? "active" : ""} onClick={() => openView("dashboard")}><BarChart3 size={19} /> Dashboard</button>
-          <button className={view === "documents" ? "active" : ""} onClick={() => openView("documents")}><ClipboardList size={19} /> Documents <span>{documents.length}</span></button>
+          <button className={view === "documents" ? "active" : ""} onClick={() => openView("documents")}><ClipboardList size={19} /> Documents <span>{visibleDocuments.length}</span></button>
           <button className={view === "routes" ? "active" : ""} onClick={() => openView("routes")}><Clock3 size={19} /> Routing log <span>{routingDocuments.length}</span></button>
           <button className={view === "alerts" ? "active" : ""} onClick={() => openView("alerts")}><ShieldAlert size={19} /> To check <span className={alerts.length ? "nav-alert" : ""}>{alerts.length}</span></button>
+          <button className={view === "archive" ? "active" : ""} onClick={() => openView("archive")}><Archive size={19} /> Archive <span>{archivedDocuments.length}</span></button>
+          <button className={view === "activity" ? "active" : ""} onClick={() => openView("activity")}><History size={19} /> Activity <span>{activities.length}</span></button>
           {isAdmin && <button className={view === "users" ? "active" : ""} onClick={() => openView("users")}><Users size={19} /> Users <span>{users.length}</span></button>}
           <button className={view === "profile" ? "active" : ""} onClick={() => openView("profile")}><UserRound size={19} /> My profile</button>
         </nav>
@@ -319,20 +421,35 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
       {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)} />}
 
       <main className="main-content">
-        <header className="topbar"><button className="menu-button" onClick={() => setMenuOpen(true)}><Menu size={20} /></button><div><p className="eyebrow">ROUTETRACK</p><h1>{viewTitle}</h1></div>{view !== "users" && view !== "profile" && <button className="primary-button top-add" onClick={newDocument}><Plus size={17} /> Quick log</button>}</header>
+        <header className="topbar"><button className="menu-button" onClick={() => setMenuOpen(true)}><Menu size={20} /></button><div><p className="eyebrow">ROUTETRACK</p><h1>{viewTitle}</h1></div><div className="topbar-actions"><InstallAppButton />{view !== "users" && view !== "profile" && <button className="primary-button top-add" onClick={newDocument}><Plus size={17} /> Quick log</button>}</div></header>
         {user.isDemo && <div className="demo-banner"><AlertTriangle size={17} /> Demo mode: records are stored only in this browser.</div>}
 
         {view === "dashboard" && <div className="page-section">
           <section className="metric-grid">
-            <Metric label="Total records" value={documents.length} note="PRF, SRF, CRF, and PO" />
+            <Metric label="Total records" value={visibleDocuments.length} note="Active PRF, SRF, CRF, and PO" />
             <Metric label="Currently active" value={active.length} note="Not completed or cancelled" />
             <Metric label="No acknowledgment" value={unacknowledged.length} note="Routed over one day ago" alert={unacknowledged.length > 0} />
             <Metric label="Completed" value={completed.length} note="Closed routing records" positive />
           </section>
-          <section className="quick-action-panel"><div><p className="eyebrow">FAST DAILY ENTRY</p><h2>Record the document before you release it.</h2><p>Enter the document number, automatic date/time, and route destination. CRF and PO show only their required additional fields.</p></div><button className="primary-button" onClick={newDocument}><FilePlus2 size={18} /> Add routing record</button></section>
+
+          <section className="daily-summary-strip">
+            <MiniMetric label="Routed today" value={routedToday.length} />
+            <MiniMetric label="Completed today" value={completedToday.length} />
+            <MiniMetric label="Pending follow-up" value={alerts.length} />
+            <MiniMetric label="Staying over 3 days" value={stalled.length} />
+          </section>
+
+          <section className="document-finder panel">
+            <div className="finder-heading"><div><p className="eyebrow">WHERE IS THE DOCUMENT?</p><h2>Search by document number, approver, receiver, supplier, or office.</h2></div>{isAdmin && <button className="secondary-button" onClick={() => void exportBackup()}><HardDriveDownload size={16} /> Download backup</button>}</div>
+            <div className="search-box finder-search"><Search size={19} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Example: Ms. Trixie Araneta, Marc Marquez, PRF 1025, supplier…" /></div>
+            <div className="finder-results">{finderResults.length ? finderResults.map((item) => <button key={item.id} onClick={() => setSelectedId(item.id)}><div><strong>{item.type} {item.requestNo}</strong><span>{item.organization || "No organization"} · {item.status}</span></div><div><span>Current holder</span><strong>{item.currentHolder}</strong></div><div><span>Last routed</span><strong>{formatDateTime(item.lastRoutedAt || item.createdAt)}</strong></div></button>) : <div className="empty-panel">No matching document or approver found.</div>}</div>
+            {normalizedSearch && <div className="finder-footer"><span>{visibleDocuments.filter((item) => documentSearchText(item).includes(normalizedSearch)).length} matching file(s)</span><button className="text-button" onClick={() => setView("documents")}>Show all matching files</button></div>}
+          </section>
+
+          <section className="quick-action-panel"><div><p className="eyebrow">FAST DAILY ENTRY</p><h2>Record the document before you release it.</h2><p>Use a routing template, enter the document number, and confirm the destination. The system keeps the complete chain of custody.</p></div><button className="primary-button" onClick={newDocument}><FilePlus2 size={18} /> Add routing record</button></section>
           <section className="dashboard-grid">
             <div className="panel"><div className="panel-heading"><h2>Latest routed documents</h2><button className="text-button" onClick={() => setView("routes")}>View all</button></div><RoutingTable documents={routingDocuments.slice(0, 7)} loading={loading} onOpen={(item) => setSelectedId(item.id)} /></div>
-            <div className="panel"><div className="panel-heading"><h2>By document type</h2></div><div className="type-summary">{DOCUMENT_TYPES.map((type) => <div key={type}><span>{type}</span><strong>{documents.filter((item) => item.type === type).length}</strong></div>)}</div><div className="amount-summary"><span>Active amount recorded</span><strong>{formatCurrency(active.reduce((sum, item) => sum + (item.amount || 0), 0))}</strong></div></div>
+            <div className="panel"><div className="panel-heading"><h2>Recent activity</h2><button className="text-button" onClick={() => setView("activity")}>View all</button></div><ActivityList activities={activities.slice(0, 8)} /></div>
           </section>
         </div>}
 
@@ -340,7 +457,11 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
 
         {view === "routes" && <div className="page-section"><section className="routing-explainer"><div><p className="eyebrow">CHAIN OF CUSTODY</p><h2>Each handoff keeps the exact date, time, person, and office.</h2><p>Open any record to add the next route or check the complete history.</p></div><Clock3 size={42} /></section><section className="panel"><Filters search={search} setSearch={setSearch} typeFilter={typeFilter} setTypeFilter={setTypeFilter} onExport={exportRoutes} /><RoutingTable documents={filteredRoutes} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={isAdmin} userMap={userMap} /></section></div>}
 
-        {view === "alerts" && <div className="page-section"><section className="alert-summary-grid"><MiniMetric label="Missing" value={missing.length} /><MiniMetric label="No acknowledgment" value={unacknowledged.length} /><MiniMetric label="Duplicate numbers" value={duplicates.length} /></section><section className="panel"><div className="panel-heading"><h2>Documents needing follow-up</h2></div>{alerts.length ? <div className="alert-card-grid">{alerts.map((item) => <button className="alert-card" key={item.id} onClick={() => setSelectedId(item.id)}><div className="alert-icon"><AlertTriangle size={20} /></div><div><strong>{item.type} {item.requestNo}</strong><span>Current: {item.currentHolder}</span><p>{normalizeStatus(item.status) === "missing" ? "Marked missing" : unacknowledged.some((route) => route.id === item.id) ? "No acknowledgment after one day" : "Duplicate number"}</p></div></button>)}</div> : <div className="empty-panel success-empty">No routing exceptions detected.</div>}</section></div>}
+        {view === "alerts" && <div className="page-section"><section className="alert-summary-grid"><MiniMetric label="Missing" value={missing.length} /><MiniMetric label="No acknowledgment" value={unacknowledged.length} /><MiniMetric label="Over 3 days" value={stalled.length} /><MiniMetric label="Duplicate numbers" value={duplicates.length} /></section><section className="panel"><div className="panel-heading"><h2>Documents needing follow-up</h2></div>{alerts.length ? <div className="alert-card-grid">{alerts.map((item) => <button className="alert-card" key={item.id} onClick={() => setSelectedId(item.id)}><div className="alert-icon"><AlertTriangle size={20} /></div><div><strong>{item.type} {item.requestNo}</strong><span>Current: {item.currentHolder}</span><p>{normalizeStatus(item.status) === "missing" ? "Marked missing" : unacknowledged.some((route) => route.id === item.id) ? "No acknowledgment after one day" : stalled.some((route) => route.id === item.id) ? "Stayed with the current holder for over three days" : "Duplicate number"}</p></div></button>)}</div> : <div className="empty-panel success-empty">No routing exceptions detected.</div>}</section></div>}
+
+        {view === "archive" && <div className="page-section"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">SOFT DELETE</p><h2>Archived documents</h2></div><span>{archivedDocuments.length} record{archivedDocuments.length === 1 ? "" : "s"}</span></div><DocumentTable documents={archivedDocuments} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={isAdmin} userMap={userMap} requestCounts={{}} /></section></div>}
+
+        {view === "activity" && <div className="page-section"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">AUDIT TRAIL</p><h2>{isAdmin ? "System activity" : "My activity"}</h2></div></div><ActivityList activities={activities} full /></section></div>}
 
         {view === "users" && isAdmin && <div className="page-section"><section className="metric-grid user-metric-grid"><Metric label="Total accounts" value={users.length} note="Registered profiles" /><Metric label="Active" value={users.filter((item) => item.active).length} note="Can use the system" positive /><Metric label="Administrators" value={users.filter((item) => isAdminRole(item.role)).length} note="Full access" /><Metric label="Disabled" value={users.filter((item) => !item.active).length} note="Access blocked" alert={users.some((item) => !item.active)} /></section><section className="panel"><div className="user-toolbar"><div className="search-box"><Search size={18} /><input placeholder="Search name, department, position…" value={userSearch} onChange={(event) => setUserSearch(event.target.value)} /></div><button className="primary-button" onClick={newUser}><UserPlus size={17} /> Create account</button></div><UserTable users={filteredUsers} currentUid={user.uid} documentCounts={documents.reduce<Record<string, number>>((acc, item) => { acc[item.ownerUid] = (acc[item.ownerUid] || 0) + 1; return acc; }, {})} onEdit={editUser} /></section></div>}
 
@@ -351,7 +472,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
       <nav className={`mobile-nav ${isAdmin ? "mobile-nav-admin" : ""}`}><button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}><BarChart3 size={19} /><span>Home</span></button><button className={view === "documents" ? "active" : ""} onClick={() => setView("documents")}><ClipboardList size={19} /><span>Documents</span></button><button className={view === "routes" ? "active" : ""} onClick={() => setView("routes")}><Clock3 size={19} /><span>Routes</span></button><button className={view === "alerts" ? "active" : ""} onClick={() => setView("alerts")}><ShieldAlert size={19} /><span>Check</span></button>{isAdmin && <button className={view === "users" ? "active" : ""} onClick={() => setView("users")}><Users size={19} /><span>Users</span></button>}</nav>
 
       {formOpen && <Modal title={editing ? "Edit document" : "Quick routing log"} onClose={() => { setFormOpen(false); setEditing(null); }} wide><DocumentForm document={editing} existingDocuments={documents.map((item) => ({ id: item.id, type: item.type, requestNo: item.requestNo }))} ownerOptions={isAdmin ? activeOwnerOptions : undefined} ownerUid={ownerUid} onOwnerChange={setOwnerUid} onSubmit={saveDocument} onCancel={() => { setFormOpen(false); setEditing(null); }} /></Modal>}
-      {selected && <Modal title={`${selected.type} ${selected.requestNo}`} onClose={() => setSelectedId(null)} wide><DocumentDetails user={user} document={{ ...selected, ownerName: userMap.get(selected.ownerUid)?.displayName || selected.ownerName, ownerEmail: userMap.get(selected.ownerUid)?.email || selected.ownerEmail }} onEdit={() => { setSelectedId(null); editDocument(selected); }} onDelete={() => deleteSelected(selected)} notify={notify} /></Modal>}
+      {selected && <Modal title={`${selected.type} ${selected.requestNo}`} onClose={() => setSelectedId(null)} wide><DocumentDetails user={user} document={{ ...selected, ownerName: userMap.get(selected.ownerUid)?.displayName || selected.ownerName, ownerEmail: userMap.get(selected.ownerUid)?.email || selected.ownerEmail }} onEdit={() => { setSelectedId(null); editDocument(selected); }} notify={notify} /></Modal>}
       {userFormOpen && isAdmin && <Modal title={editingUser ? "Edit user account" : "Create user account"} onClose={() => { setUserFormOpen(false); setEditingUser(null); }}><UserForm profile={editingUser} isSelf={editingUser?.uid === user.uid} onSubmit={saveUserAccount} onCancel={() => { setUserFormOpen(false); setEditingUser(null); }} /></Modal>}
       {toast && <div className={`toast ${toast.error ? "toast-error" : ""}`}>{toast.message}</div>}
     </div>
@@ -388,4 +509,9 @@ function RoutingTable({ documents, loading, onOpen, showOwner = false, userMap =
 function UserTable({ users, currentUid, documentCounts, onEdit }: { users: UserProfile[]; currentUid: string; documentCounts: Record<string, number>; onEdit: (profile: UserProfile) => void }) {
   if (!users.length) return <div className="empty-panel">No user accounts found.</div>;
   return <div className="table-wrap"><table className="users-table"><thead><tr><th>User</th><th>Department / position</th><th>Role</th><th>Status</th><th>Records</th><th>Action</th></tr></thead><tbody>{users.map((profile) => <tr key={profile.uid}><td><div className="table-user"><Avatar name={profile.displayName} photoDataUrl={profile.photoDataUrl} size="small" /><div><strong>{profile.displayName}{profile.uid === currentUid ? " (You)" : ""}</strong><span>{profile.email}</span></div></div></td><td><strong>{profile.department || "Not assigned"}</strong><span>{profile.position || ""}</span></td><td><span className={`role-pill role-${isAdminRole(profile.role) ? "admin" : "staff"}`}>{isAdminRole(profile.role) ? "Administrator" : "Staff"}</span></td><td><span className={`account-status ${profile.active ? "account-active" : "account-disabled"}`}>{profile.active ? "Active" : "Disabled"}</span></td><td>{documentCounts[profile.uid] || 0}</td><td><button className="secondary-button compact-button" onClick={() => onEdit(profile)}><UserCog size={15} /> Manage</button></td></tr>)}</tbody></table></div>;
+}
+
+function ActivityList({ activities, full = false }: { activities: ActivityRecord[]; full?: boolean }) {
+  if (!activities.length) return <div className="empty-panel">No activity recorded yet.</div>;
+  return <div className={full ? "activity-list activity-list-full" : "activity-list"}>{activities.map((item) => <article key={item.id} className="activity-item"><div className="activity-icon"><History size={16} /></div><div><strong>{item.summary}</strong><span>{item.actorName || item.actorEmail} · {formatDateTime(item.createdAt)}</span>{item.documentLabel && <small>{item.documentLabel}</small>}</div><span className="activity-action">{item.action.replaceAll("_", " ")}</span></article>)}</div>;
 }

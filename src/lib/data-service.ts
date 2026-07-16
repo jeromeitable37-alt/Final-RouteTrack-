@@ -24,6 +24,7 @@ import {
 } from "firebase/firestore";
 import { firebaseConfig, db, firebaseConfigured } from "./firebase";
 import {
+  ActivityRecord,
   DocumentInput,
   DocumentRecord,
   ManagedUserInput,
@@ -37,9 +38,11 @@ import { isBootstrapAdminEmail } from "./admin-config";
 
 const GLOBAL_DOCS_KEY = "routetrack-documents:global-v4";
 const GLOBAL_USERS_KEY = "routetrack-users:global-v4";
+const GLOBAL_ACTIVITY_KEY = "routetrack-activity:global-v5";
 const routesKey = (documentId: string) => `routetrack-routes:v4:${documentId}`;
 const legacyDocsKey = (uid: string) => `prf-srf-documents:${uid}`;
-const legacyRoutesKey = (uid: string, documentId: string) => `prf-srf-routes:${uid}:${documentId}`;
+const legacyRoutesKey = (uid: string, documentId: string) =>
+  `prf-srf-routes:${uid}:${documentId}`;
 const localEvent = "routetrack-local-change";
 
 function loadLocal<T>(key: string): T[] {
@@ -57,10 +60,17 @@ function saveLocal<T>(key: string, value: T[]): void {
 }
 
 function normalizeUserProfile(profile: UserProfile): UserProfile {
-  const normalizedRole = String(profile.role || "staff").trim().toLowerCase() === "admin" ? "admin" : "staff";
+  const normalizedRole =
+    String(profile.role || "staff")
+      .trim()
+      .toLowerCase() === "admin"
+      ? "admin"
+      : "staff";
   return {
     ...profile,
-    email: String(profile.email || "").trim().toLowerCase(),
+    email: String(profile.email || "")
+      .trim()
+      .toLowerCase(),
     displayName: String(profile.displayName || profile.email || "User").trim(),
     department: String(profile.department || "").trim(),
     position: String(profile.position || "").trim(),
@@ -71,7 +81,9 @@ function normalizeUserProfile(profile: UserProfile): UserProfile {
   };
 }
 
-function normalizeDocument(raw: Partial<DocumentRecord> & { id: string }): DocumentRecord {
+function normalizeDocument(
+  raw: Partial<DocumentRecord> & { id: string },
+): DocumentRecord {
   const now = new Date().toISOString();
   return {
     id: raw.id,
@@ -79,15 +91,21 @@ function normalizeDocument(raw: Partial<DocumentRecord> & { id: string }): Docum
     ownerUid: String(raw.ownerUid || ""),
     ownerName: String(raw.ownerName || "Unknown user"),
     ownerEmail: String(raw.ownerEmail || ""),
-    type: (["PRF", "SRF", "CRF", "PO"] as const).includes(raw.type as never) ? raw.type as DocumentRecord["type"] : "PRF",
+    type: (["PRF", "SRF", "CRF", "PO"] as const).includes(raw.type as never)
+      ? (raw.type as DocumentRecord["type"])
+      : "PRF",
     requestNo: String(raw.requestNo || ""),
-    dateRequested: String(raw.dateRequested || raw.dateLogged || now.slice(0, 10)),
+    dateRequested: String(
+      raw.dateRequested || raw.dateLogged || now.slice(0, 10),
+    ),
     requestingDepartment: String(raw.requestingDepartment || ""),
     requestor: String(raw.requestor || raw.purchasingEmployee || ""),
     subjectPurpose: String(raw.subjectPurpose || raw.itemsDescription || ""),
     amount: Number(raw.amount || 0),
     dateLogged: String(raw.dateLogged || raw.dateRequested || now.slice(0, 10)),
-    currentHolder: String(raw.currentHolder || raw.lastToOffice || "Student Assistant / Records"),
+    currentHolder: String(
+      raw.currentHolder || raw.lastToOffice || "Student Assistant / Records",
+    ),
     status: raw.status || "For Routing",
     dueDate: String(raw.dueDate || ""),
     copyType: raw.copyType || "Original",
@@ -111,15 +129,23 @@ function normalizeDocument(raw: Partial<DocumentRecord> & { id: string }): Docum
     lastMovementStatus: raw.lastMovementStatus,
     lastRouteEncodedBy: raw.lastRouteEncodedBy,
     lastProofReference: raw.lastProofReference,
+    routeSearchText: String(raw.routeSearchText || ""),
+    completedAt: raw.completedAt,
+    archivedAt: raw.archivedAt,
+    archivedBy: raw.archivedBy,
   };
 }
 
 function sortDocuments(items: DocumentRecord[]): DocumentRecord[] {
-  return [...items].map((item) => normalizeDocument(item)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return [...items]
+    .map((item) => normalizeDocument(item))
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 function sortUsers(items: UserProfile[]): UserProfile[] {
-  return [...items].map(normalizeUserProfile).sort((a, b) => a.displayName.localeCompare(b.displayName));
+  return [...items]
+    .map(normalizeUserProfile)
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
 }
 
 function seedDemoUsers(): UserProfile[] {
@@ -158,15 +184,26 @@ function seedDemoUsers(): UserProfile[] {
   return seeded;
 }
 
-export async function ensureUserProfile(firebaseUser: FirebaseUser): Promise<UserProfile> {
-  if (!firebaseConfigured || !db) throw new Error("Firebase is not configured.");
+export async function ensureUserProfile(
+  firebaseUser: FirebaseUser,
+): Promise<UserProfile> {
+  if (!firebaseConfigured || !db)
+    throw new Error("Firebase is not configured.");
 
   const ref = doc(db, "users", firebaseUser.uid);
   const snapshot = await getDoc(ref);
   if (snapshot.exists()) {
     let profile = normalizeUserProfile(snapshot.data() as UserProfile);
-    if (isBootstrapAdminEmail(firebaseUser.email || profile.email) && profile.role !== "admin") {
-      profile = { ...profile, role: "admin", active: true, updatedAt: new Date().toISOString() };
+    if (
+      isBootstrapAdminEmail(firebaseUser.email || profile.email) &&
+      profile.role !== "admin"
+    ) {
+      profile = {
+        ...profile,
+        role: "admin",
+        active: true,
+        updatedAt: new Date().toISOString(),
+      };
       await setDoc(ref, profile, { merge: true });
     }
     return profile;
@@ -191,14 +228,30 @@ export async function ensureUserProfile(firebaseUser: FirebaseUser): Promise<Use
   return profile;
 }
 
-export function subscribeUserProfile(uid: string, callback: (profile: UserProfile | null) => void): () => void {
+export function subscribeUserProfile(
+  uid: string,
+  callback: (profile: UserProfile | null) => void,
+): () => void {
   if (firebaseConfigured && db) {
-    return onSnapshot(doc(db, "users", uid), (snapshot) => {
-      callback(snapshot.exists() ? normalizeUserProfile(snapshot.data() as UserProfile) : null);
-    }, () => callback(null));
+    return onSnapshot(
+      doc(db, "users", uid),
+      (snapshot) => {
+        callback(
+          snapshot.exists()
+            ? normalizeUserProfile(snapshot.data() as UserProfile)
+            : null,
+        );
+      },
+      () => callback(null),
+    );
   }
   seedDemoUsers();
-  const emit = () => callback(loadLocal<UserProfile>(GLOBAL_USERS_KEY).find((item) => item.uid === uid) || null);
+  const emit = () =>
+    callback(
+      loadLocal<UserProfile>(GLOBAL_USERS_KEY).find(
+        (item) => item.uid === uid,
+      ) || null,
+    );
   const listener = (event: Event) => {
     const custom = event as CustomEvent<string>;
     if (custom.detail === GLOBAL_USERS_KEY) emit();
@@ -208,14 +261,19 @@ export function subscribeUserProfile(uid: string, callback: (profile: UserProfil
   return () => window.removeEventListener(localEvent, listener);
 }
 
-export function subscribeUsers(callback: (items: UserProfile[]) => void): () => void {
+export function subscribeUsers(
+  callback: (items: UserProfile[]) => void,
+): () => void {
   if (firebaseConfigured && db) {
     return onSnapshot(collection(db, "users"), (snapshot) => {
-      callback(sortUsers(snapshot.docs.map((item) => item.data() as UserProfile)));
+      callback(
+        sortUsers(snapshot.docs.map((item) => item.data() as UserProfile)),
+      );
     });
   }
   seedDemoUsers();
-  const emit = () => callback(sortUsers(loadLocal<UserProfile>(GLOBAL_USERS_KEY)));
+  const emit = () =>
+    callback(sortUsers(loadLocal<UserProfile>(GLOBAL_USERS_KEY)));
   const listener = (event: Event) => {
     const custom = event as CustomEvent<string>;
     if (custom.detail === GLOBAL_USERS_KEY) emit();
@@ -225,18 +283,30 @@ export function subscribeUsers(callback: (items: UserProfile[]) => void): () => 
   return () => window.removeEventListener(localEvent, listener);
 }
 
-export async function createManagedUser(input: ManagedUserInput): Promise<UserProfile> {
+export async function createManagedUser(
+  input: ManagedUserInput,
+): Promise<UserProfile> {
   const now = new Date().toISOString();
   if (firebaseConfigured && db) {
-    if (!input.password || input.password.length < 6) throw new Error("Temporary password must contain at least 6 characters.");
-    const secondaryApp = initializeApp(firebaseConfig, `managed-user-${Date.now()}`);
+    if (!input.password || input.password.length < 6)
+      throw new Error("Temporary password must contain at least 6 characters.");
+    const secondaryApp = initializeApp(
+      firebaseConfig,
+      `managed-user-${Date.now()}`,
+    );
     const secondaryAuth = getAuth(secondaryApp);
     let createdUser: FirebaseUser | null = null;
     try {
       await setPersistence(secondaryAuth, inMemoryPersistence);
-      const credential = await createUserWithEmailAndPassword(secondaryAuth, input.email.trim(), input.password);
+      const credential = await createUserWithEmailAndPassword(
+        secondaryAuth,
+        input.email.trim(),
+        input.password,
+      );
       createdUser = credential.user;
-      await updateProfile(createdUser, { displayName: input.displayName.trim() });
+      await updateProfile(createdUser, {
+        displayName: input.displayName.trim(),
+      });
       const profile: UserProfile = {
         uid: createdUser.uid,
         email: input.email.trim().toLowerCase(),
@@ -254,11 +324,19 @@ export async function createManagedUser(input: ManagedUserInput): Promise<UserPr
       return profile;
     } catch (error) {
       if (createdUser) {
-        try { await deleteUser(createdUser); } catch { /* manual cleanup may be needed */ }
+        try {
+          await deleteUser(createdUser);
+        } catch {
+          /* manual cleanup may be needed */
+        }
       }
       throw error;
     } finally {
-      try { await signOut(secondaryAuth); } catch { /* no-op */ }
+      try {
+        await signOut(secondaryAuth);
+      } catch {
+        /* no-op */
+      }
       await deleteApp(secondaryApp);
     }
   }
@@ -277,36 +355,49 @@ export async function createManagedUser(input: ManagedUserInput): Promise<UserPr
     updatedAt: now,
   };
   const users = seedDemoUsers();
-  if (users.some((item) => item.email === profile.email)) throw new Error("That email address already exists.");
+  if (users.some((item) => item.email === profile.email))
+    throw new Error("That email address already exists.");
   saveLocal(GLOBAL_USERS_KEY, [...users, profile]);
   return profile;
 }
 
-export async function updateManagedUser(uid: string, changes: Partial<UserProfile>): Promise<void> {
+export async function updateManagedUser(
+  uid: string,
+  changes: Partial<UserProfile>,
+): Promise<void> {
   const payload = { ...changes, uid, updatedAt: new Date().toISOString() };
   if (firebaseConfigured && db) {
-    await updateDoc(doc(db, "users", uid), payload);
+    await setDoc(doc(db, "users", uid), payload, { merge: true });
     return;
   }
-  const users = seedDemoUsers().map((item) => item.uid === uid ? { ...item, ...payload } : item);
+  const users = seedDemoUsers().map((item) =>
+    item.uid === uid ? { ...item, ...payload } : item,
+  );
   saveLocal(GLOBAL_USERS_KEY, users);
 }
 
 function migrateLocalLegacyDocuments(owner: UserProfile): void {
-  const legacy = loadLocal<Omit<DocumentRecord, "ownerUid" | "ownerName" | "ownerEmail">>(legacyDocsKey(owner.uid));
+  const legacy = loadLocal<
+    Omit<DocumentRecord, "ownerUid" | "ownerName" | "ownerEmail">
+  >(legacyDocsKey(owner.uid));
   if (!legacy.length) return;
   const global = loadLocal<DocumentRecord>(GLOBAL_DOCS_KEY);
   const knownIds = new Set(global.map((item) => item.id));
-  const migrated = legacy.filter((item) => !knownIds.has(item.id)).map((item) => ({
-    ...item,
-    ownerUid: owner.uid,
-    ownerName: owner.displayName,
-    ownerEmail: owner.email,
-  }));
-  if (migrated.length) saveLocal(GLOBAL_DOCS_KEY, [...global, ...migrated] as DocumentRecord[]);
+  const migrated = legacy
+    .filter((item) => !knownIds.has(item.id))
+    .map((item) => ({
+      ...item,
+      ownerUid: owner.uid,
+      ownerName: owner.displayName,
+      ownerEmail: owner.email,
+    }));
+  if (migrated.length)
+    saveLocal(GLOBAL_DOCS_KEY, [...global, ...migrated] as DocumentRecord[]);
 }
 
-export async function migrateLegacyDocuments(owner: UserProfile): Promise<void> {
+export async function migrateLegacyDocuments(
+  owner: UserProfile,
+): Promise<void> {
   if (!firebaseConfigured || !db) {
     migrateLocalLegacyDocuments(owner);
     return;
@@ -324,9 +415,24 @@ export async function migrateLegacyDocuments(owner: UserProfile): Promise<void> 
         ownerEmail: owner.email,
       });
     }
-    const legacyRoutes = await getDocs(collection(db, "users", owner.uid, "documents", legacyDocument.id, "routes"));
+    const legacyRoutes = await getDocs(
+      collection(
+        db,
+        "users",
+        owner.uid,
+        "documents",
+        legacyDocument.id,
+        "routes",
+      ),
+    );
     for (const legacyRoute of legacyRoutes.docs) {
-      const destinationRoute = doc(db, "documents", legacyDocument.id, "routes", legacyRoute.id);
+      const destinationRoute = doc(
+        db,
+        "documents",
+        legacyDocument.id,
+        "routes",
+        legacyRoute.id,
+      );
       const existingRoute = await getDoc(destinationRoute);
       if (!existingRoute.exists()) {
         await setDoc(destinationRoute, {
@@ -339,14 +445,30 @@ export async function migrateLegacyDocuments(owner: UserProfile): Promise<void> 
   }
 }
 
-export function subscribeDocuments(uid: string, callback: (items: DocumentRecord[]) => void): () => void {
+export function subscribeDocuments(
+  uid: string,
+  callback: (items: DocumentRecord[]) => void,
+): () => void {
   if (firebaseConfigured && db) {
     const q = query(collection(db, "documents"), where("ownerUid", "==", uid));
     return onSnapshot(q, (snapshot) => {
-      callback(sortDocuments(snapshot.docs.map((item) => normalizeDocument({ id: item.id, ...item.data() }))));
+      callback(
+        sortDocuments(
+          snapshot.docs.map((item) =>
+            normalizeDocument({ id: item.id, ...item.data() }),
+          ),
+        ),
+      );
     });
   }
-  const emit = () => callback(sortDocuments(loadLocal<DocumentRecord>(GLOBAL_DOCS_KEY).filter((item) => item.ownerUid === uid)));
+  const emit = () =>
+    callback(
+      sortDocuments(
+        loadLocal<DocumentRecord>(GLOBAL_DOCS_KEY).filter(
+          (item) => item.ownerUid === uid,
+        ),
+      ),
+    );
   const listener = (event: Event) => {
     const custom = event as CustomEvent<string>;
     if (custom.detail === GLOBAL_DOCS_KEY) emit();
@@ -356,13 +478,22 @@ export function subscribeDocuments(uid: string, callback: (items: DocumentRecord
   return () => window.removeEventListener(localEvent, listener);
 }
 
-export function subscribeAllDocuments(callback: (items: DocumentRecord[]) => void): () => void {
+export function subscribeAllDocuments(
+  callback: (items: DocumentRecord[]) => void,
+): () => void {
   if (firebaseConfigured && db) {
     return onSnapshot(collection(db, "documents"), (snapshot) => {
-      callback(sortDocuments(snapshot.docs.map((item) => normalizeDocument({ id: item.id, ...item.data() }))));
+      callback(
+        sortDocuments(
+          snapshot.docs.map((item) =>
+            normalizeDocument({ id: item.id, ...item.data() }),
+          ),
+        ),
+      );
     });
   }
-  const emit = () => callback(sortDocuments(loadLocal<DocumentRecord>(GLOBAL_DOCS_KEY)));
+  const emit = () =>
+    callback(sortDocuments(loadLocal<DocumentRecord>(GLOBAL_DOCS_KEY)));
   const listener = (event: Event) => {
     const custom = event as CustomEvent<string>;
     if (custom.detail === GLOBAL_DOCS_KEY) emit();
@@ -372,7 +503,10 @@ export function subscribeAllDocuments(callback: (items: DocumentRecord[]) => voi
   return () => window.removeEventListener(localEvent, listener);
 }
 
-export async function addDocument(owner: Pick<UserProfile, "uid" | "displayName" | "email">, input: DocumentInput): Promise<string> {
+export async function addDocument(
+  owner: Pick<UserProfile, "uid" | "displayName" | "email">,
+  input: DocumentInput,
+): Promise<string> {
   const now = new Date().toISOString();
   const payload = {
     ...input,
@@ -396,37 +530,69 @@ export async function addDocument(owner: Pick<UserProfile, "uid" | "displayName"
   return id;
 }
 
-export async function updateDocument(id: string, changes: Partial<DocumentRecord>): Promise<void> {
-  const { ownerUid: _ownerUid, ownerName: _ownerName, ownerEmail: _ownerEmail, ...safeChanges } = changes;
+export async function updateDocument(
+  id: string,
+  changes: Partial<DocumentRecord>,
+): Promise<void> {
+  const {
+    ownerUid: _ownerUid,
+    ownerName: _ownerName,
+    ownerEmail: _ownerEmail,
+    ...safeChanges
+  } = changes;
   const payload = { ...safeChanges, updatedAt: new Date().toISOString() };
   if (firebaseConfigured && db) {
     await updateDoc(doc(db, "documents", id), payload);
     return;
   }
-  const documents = loadLocal<DocumentRecord>(GLOBAL_DOCS_KEY).map((item) => item.id === id ? normalizeDocument({ ...item, ...payload, id }) : item);
+  const documents = loadLocal<DocumentRecord>(GLOBAL_DOCS_KEY).map((item) =>
+    item.id === id ? normalizeDocument({ ...item, ...payload, id }) : item,
+  );
   saveLocal(GLOBAL_DOCS_KEY, documents);
 }
 
 export async function removeDocument(id: string): Promise<void> {
   if (firebaseConfigured && db) {
-    const routeSnapshot = await getDocs(collection(db, "documents", id, "routes"));
+    const routeSnapshot = await getDocs(
+      collection(db, "documents", id, "routes"),
+    );
     await Promise.all(routeSnapshot.docs.map((item) => deleteDoc(item.ref)));
     await deleteDoc(doc(db, "documents", id));
     return;
   }
-  saveLocal(GLOBAL_DOCS_KEY, loadLocal<DocumentRecord>(GLOBAL_DOCS_KEY).filter((item) => item.id !== id));
+  saveLocal(
+    GLOBAL_DOCS_KEY,
+    loadLocal<DocumentRecord>(GLOBAL_DOCS_KEY).filter((item) => item.id !== id),
+  );
   localStorage.removeItem(routesKey(id));
 }
 
-export function subscribeRoutes(documentId: string, callback: (items: RoutingRecord[]) => void): () => void {
+export function subscribeRoutes(
+  documentId: string,
+  callback: (items: RoutingRecord[]) => void,
+): () => void {
   if (firebaseConfigured && db) {
-    return onSnapshot(collection(db, "documents", documentId, "routes"), (snapshot) => {
-      const items = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as RoutingRecord);
-      callback(items.sort((a, b) => b.dateTimeRouted.localeCompare(a.dateTimeRouted)));
-    });
+    return onSnapshot(
+      collection(db, "documents", documentId, "routes"),
+      (snapshot) => {
+        const items = snapshot.docs.map(
+          (item) => ({ id: item.id, ...item.data() }) as RoutingRecord,
+        );
+        callback(
+          items.sort((a, b) =>
+            b.dateTimeRouted.localeCompare(a.dateTimeRouted),
+          ),
+        );
+      },
+    );
   }
   const key = routesKey(documentId);
-  const emit = () => callback(loadLocal<RoutingRecord>(key).sort((a, b) => b.dateTimeRouted.localeCompare(a.dateTimeRouted)));
+  const emit = () =>
+    callback(
+      loadLocal<RoutingRecord>(key).sort((a, b) =>
+        b.dateTimeRouted.localeCompare(a.dateTimeRouted),
+      ),
+    );
   const listener = (event: Event) => {
     const custom = event as CustomEvent<string>;
     if (custom.detail === key) emit();
@@ -436,15 +602,38 @@ export function subscribeRoutes(documentId: string, callback: (items: RoutingRec
   return () => window.removeEventListener(localEvent, listener);
 }
 
-export async function migrateLocalLegacyRoutes(ownerUid: string, documentId: string): Promise<void> {
+export async function getRoutes(documentId: string): Promise<RoutingRecord[]> {
+  if (firebaseConfigured && db) {
+    const snapshot = await getDocs(
+      collection(db, "documents", documentId, "routes"),
+    );
+    return snapshot.docs
+      .map((item) => ({ id: item.id, ...item.data() }) as RoutingRecord)
+      .sort((a, b) => b.dateTimeRouted.localeCompare(a.dateTimeRouted));
+  }
+  return loadLocal<RoutingRecord>(routesKey(documentId)).sort((a, b) =>
+    b.dateTimeRouted.localeCompare(a.dateTimeRouted),
+  );
+}
+
+export async function migrateLocalLegacyRoutes(
+  ownerUid: string,
+  documentId: string,
+): Promise<void> {
   if (firebaseConfigured) return;
   const current = loadLocal<RoutingRecord>(routesKey(documentId));
   if (current.length) return;
-  const legacy = loadLocal<RoutingRecord>(legacyRoutesKey(ownerUid, documentId));
+  const legacy = loadLocal<RoutingRecord>(
+    legacyRoutesKey(ownerUid, documentId),
+  );
   if (legacy.length) saveLocal(routesKey(documentId), legacy);
 }
 
-export async function addRoute(actor: Pick<SessionUser, "uid" | "displayName">, documentId: string, input: RoutingInput): Promise<void> {
+export async function addRoute(
+  actor: Pick<SessionUser, "uid" | "displayName">,
+  documentId: string,
+  input: RoutingInput,
+): Promise<void> {
   const payload = {
     ...input,
     documentId,
@@ -460,4 +649,78 @@ export async function addRoute(actor: Pick<SessionUser, "uid" | "displayName">, 
   const routes = loadLocal<RoutingRecord>(key);
   routes.unshift({ id: crypto.randomUUID(), ...payload });
   saveLocal(key, routes);
+}
+
+export async function addActivityLog(
+  actor: Pick<SessionUser, "uid" | "displayName" | "email">,
+  action: string,
+  summary: string,
+  document?: Pick<DocumentRecord, "id" | "type" | "requestNo">,
+): Promise<void> {
+  const payload = {
+    actorUid: actor.uid,
+    actorName: actor.displayName || actor.email,
+    actorEmail: actor.email,
+    action,
+    summary,
+    documentId: document?.id || "",
+    documentLabel: document ? `${document.type} ${document.requestNo}` : "",
+    createdAt: new Date().toISOString(),
+  };
+  if (firebaseConfigured && db) {
+    try {
+      await addDoc(collection(db, "activityLogs"), payload);
+    } catch {
+      // Activity logging must never block the main document action.
+    }
+    return;
+  }
+  const items = loadLocal<ActivityRecord>(GLOBAL_ACTIVITY_KEY);
+  items.unshift({ id: crypto.randomUUID(), ...payload });
+  saveLocal(GLOBAL_ACTIVITY_KEY, items.slice(0, 1000));
+}
+
+export function subscribeActivityLogs(
+  user: Pick<SessionUser, "uid" | "role">,
+  callback: (items: ActivityRecord[]) => void,
+): () => void {
+  const admin =
+    String(user.role || "")
+      .trim()
+      .toLowerCase() === "admin";
+  if (firebaseConfigured && db) {
+    const source = admin
+      ? collection(db, "activityLogs")
+      : query(
+          collection(db, "activityLogs"),
+          where("actorUid", "==", user.uid),
+        );
+    return onSnapshot(
+      source,
+      (snapshot) => {
+        const items = snapshot.docs.map(
+          (item) => ({ id: item.id, ...item.data() }) as ActivityRecord,
+        );
+        callback(
+          items
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+            .slice(0, 500),
+        );
+      },
+      () => callback([]),
+    );
+  }
+  const emit = () => {
+    const items = loadLocal<ActivityRecord>(GLOBAL_ACTIVITY_KEY)
+      .filter((item) => admin || item.actorUid === user.uid)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    callback(items);
+  };
+  const listener = (event: Event) => {
+    const custom = event as CustomEvent<string>;
+    if (custom.detail === GLOBAL_ACTIVITY_KEY) emit();
+  };
+  emit();
+  window.addEventListener(localEvent, listener);
+  return () => window.removeEventListener(localEvent, listener);
 }

@@ -5,8 +5,13 @@ import { DocumentRecord, MOVEMENT_STATUSES, RoutingInput } from "@/lib/types";
 import { nowLocalInput } from "@/lib/utils";
 import { ROUTE_CONTACTS, ROUTE_PURPOSES, nextRouteSuggestions, suggestedPurpose } from "@/lib/workflow";
 import { SmartInput } from "./SmartInput";
+import { ProofPhotoPicker } from "./ProofPhotoPicker";
 
-export function RoutingForm({ document, onSubmit, onCancel }: { document: DocumentRecord; onSubmit: (input: RoutingInput) => Promise<void>; onCancel: () => void }) {
+export function RoutingForm({ document, onSubmit, onCancel }: {
+  document: DocumentRecord;
+  onSubmit: (input: RoutingInput) => Promise<void>;
+  onCancel: () => void;
+}) {
   const suggestions = useMemo(() => nextRouteSuggestions(document), [document]);
   const initialDestination = suggestions[0] || "";
   const [form, setForm] = useState<RoutingInput>({
@@ -18,6 +23,9 @@ export function RoutingForm({ document, onSubmit, onCancel }: { document: Docume
     dateTimeReceived: "",
     movementStatus: "Routed",
     proofReference: "",
+    proofPhotoDataUrl: "",
+    receiverConfirmation: "",
+    eventType: "route",
     remarks: "",
   });
   const [saving, setSaving] = useState(false);
@@ -49,12 +57,18 @@ export function RoutingForm({ document, onSubmit, onCancel }: { document: Docume
         <SmartInput label="From person / office" value={form.fromOffice} options={ROUTE_CONTACTS} onChange={(fromOffice) => update("fromOffice", fromOffice)} required />
         <SmartInput label="Route to person / office" value={form.toOffice} options={ROUTE_CONTACTS} onChange={chooseDestination} required help="Choose a suggestion or type another person or department." />
         <SmartInput className="span-2" label="Purpose / action needed" value={form.actionPurpose} options={ROUTE_PURPOSES} onChange={(actionPurpose) => update("actionPurpose", actionPurpose)} required />
-        <label>Received by<input value={form.receivedBy} onChange={(event) => update("receivedBy", event.target.value)} placeholder="Optional acknowledgment name" /></label>
+        <label>Received by<input value={form.receivedBy} onChange={(event) => update("receivedBy", event.target.value)} placeholder="Optional if not yet acknowledged" /></label>
         <label>Date / time received<input type="datetime-local" value={form.dateTimeReceived} onChange={(event) => update("dateTimeReceived", event.target.value)} /></label>
-        <label>Proof / reference<input value={form.proofReference} onChange={(event) => update("proofReference", event.target.value)} placeholder="Signature, message, email reference" /></label>
-        <label>Remarks<input value={form.remarks} onChange={(event) => update("remarks", event.target.value)} /></label>
+        <label>Receiver initials / confirmation code<input value={form.receiverConfirmation || ""} onChange={(event) => update("receiverConfirmation", event.target.value)} placeholder="Optional" /></label>
+        <label>Proof reference<input value={form.proofReference} onChange={(event) => update("proofReference", event.target.value)} placeholder="Optional logbook or receipt number" /></label>
+        <label className="span-2">Remarks<textarea rows={2} value={form.remarks} onChange={(event) => update("remarks", event.target.value)} placeholder="Optional notes" /></label>
+        <ProofPhotoPicker value={form.proofPhotoDataUrl} onChange={(value) => update("proofPhotoDataUrl", value)} />
       </div>
-      <div className="form-actions"><button type="button" className="secondary-button" onClick={onCancel}>Cancel</button><button className="primary-button" disabled={saving}>{saving ? "Saving…" : "Record handoff"}</button></div>
+
+      <div className="form-actions">
+        <button type="button" className="secondary-button" onClick={onCancel}>Cancel</button>
+        <button className="primary-button" disabled={saving || !form.toOffice.trim() || !form.dateTimeRouted}>{saving ? "Saving…" : "Save routing handoff"}</button>
+      </div>
     </form>
   );
 }

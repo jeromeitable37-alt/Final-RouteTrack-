@@ -14,6 +14,7 @@ import {
   PAYMENT_TERMS,
   ROUTE_CONTACTS,
   ROUTE_PURPOSES,
+  ROUTING_TEMPLATES,
   suggestedInitialDestination,
   suggestedPurpose,
 } from "@/lib/workflow";
@@ -259,6 +260,7 @@ export function DocumentForm({
     : baseDocument();
 
   const [form, setForm] = useState<DocumentInput>(initial);
+  const [templateId, setTemplateId] = useState("");
 
   const [dateTimeRouted, setDateTimeRouted] = useState(
     document?.lastRoutedAt || nowLocalInput()
@@ -424,6 +426,21 @@ export function DocumentForm({
     setRoutePurpose(suggestedPurpose(value));
   }
 
+  function applyTemplate(id: string) {
+    setTemplateId(id);
+    const template = ROUTING_TEMPLATES.find((item) => item.id === id);
+    if (!template) return;
+    setForm((current) => ({
+      ...current,
+      type: template.type,
+      organization: template.organization,
+      status: template.type === "CRF" || template.type === "PO" ? "Completed" : "In Transit",
+    }));
+    setRouteTouched(true);
+    setRouteTo(template.destination);
+    setRoutePurpose(template.purpose);
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
 
@@ -477,6 +494,9 @@ export function DocumentForm({
           dateTimeReceived: "",
           movementStatus: "Routed",
           proofReference: "",
+          proofPhotoDataUrl: "",
+          receiverConfirmation: "",
+          eventType: "route",
           remarks: form.remarks,
         },
       });
@@ -509,6 +529,18 @@ export function DocumentForm({
       </section>
 
       <div className="form-grid">
+        {!document && (
+          <label className="span-2">
+            Routing template
+            <select value={templateId} onChange={(event) => applyTemplate(event.target.value)}>
+              <option value="">Choose a common workflow or continue manually</option>
+              {ROUTING_TEMPLATES.map((template) => (
+                <option key={template.id} value={template.id}>{template.label}</option>
+              ))}
+            </select>
+            <span className="field-help">A template automatically selects the document type, organization, destination, and routing purpose.</span>
+          </label>
+        )}
         {ownerOptions && ownerOptions.length > 0 && (
           <label className="span-2">
             Record owner

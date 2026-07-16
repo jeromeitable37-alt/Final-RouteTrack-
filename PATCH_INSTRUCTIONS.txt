@@ -1,0 +1,48 @@
+ROUTETRACK ENHANCEMENT PATCH — UPDATE THE EXISTING DEPLOYMENT
+
+This is a patch for the existing GitHub/Vercel project. Do not create a new repository or Vercel project.
+
+1. BACK UP YOUR CURRENT PROJECT FOLDER.
+
+2. Extract RouteTrack_Traceability_Enhancement_Patch.zip.
+
+3. Copy every extracted file and folder into the ROOT of your current RouteTrack GitHub project folder.
+   Choose "Replace the files in the destination" when Windows asks.
+   Keep your existing hidden .git folder and .env.local file.
+
+4. Open the project folder in VS Code and run:
+   npm install
+   npm run build
+
+5. IMPORTANT FIREBASE STEP:
+   Open the updated firestore.rules file.
+   Copy all of it to Firebase Console > Firestore Database > Rules.
+   Click Publish.
+
+6. Upload the update to the SAME GitHub repository:
+   git add .
+   git commit -m "Add document traceability and approver search enhancements"
+   git push origin main
+
+7. Vercel will redeploy the SAME project automatically.
+   Vercel > Project > Deployments > wait for Ready.
+
+8. Open the existing Vercel URL and press Ctrl + Shift + R.
+
+NEW FEATURES:
+- Search by document number, current holder, ANY previous approver/receiver, supplier, or office
+- Dashboard "Where is the document?" finder and Show all matching files
+- Receipt acknowledgment with exact receiver/date/time
+- Receiver initials/confirmation code and optional compressed photo proof
+- QR code on every document for phone tracing
+- Routing templates and automatic next-route suggestions
+- Quick Completed, Missing, Returned, Archive, and Restore actions
+- Complete chain-of-custody timeline
+- Routed today, Completed today, pending, and over-3-days summaries
+- No-acknowledgment and stalled-document alerts
+- Activity/audit log
+- Soft delete through Archive instead of permanent deletion
+- CSV exports, printable trace, and JSON backup
+- Installable phone app support
+
+Your existing Firebase accounts and document records remain in the same database.

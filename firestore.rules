@@ -91,8 +91,8 @@ service cloud.firestore {
         && (isAdmin() || resource.data.ownerUid == request.auth.uid)
         && request.resource.data.ownerUid == resource.data.ownerUid;
 
-      allow delete: if isActive()
-        && (isAdmin() || resource.data.ownerUid == request.auth.uid);
+      // Documents use soft delete/archive so the audit trail is preserved.
+      allow delete: if false;
 
       match /routes/{routeId} {
         allow read: if isActive()
@@ -111,12 +111,18 @@ service cloud.firestore {
 
         allow update: if false;
 
-        allow delete: if isActive()
-          && (
-            isAdmin()
-            || get(/databases/$(database)/documents/documents/$(documentId)).data.ownerUid == request.auth.uid
-          );
+        allow delete: if false;
       }
     }
+    match /activityLogs/{activityId} {
+      allow create: if isActive()
+        && request.resource.data.actorUid == request.auth.uid;
+
+      allow read: if isAdmin()
+        || (isActive() && resource.data.actorUid == request.auth.uid);
+
+      allow update, delete: if false;
+    }
+
   }
 }
