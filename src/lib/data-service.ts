@@ -540,7 +540,14 @@ export async function updateDocument(
     ownerEmail: _ownerEmail,
     ...safeChanges
   } = changes;
-  const payload = { ...safeChanges, updatedAt: new Date().toISOString() };
+  // Firestore rejects undefined values. Preserve valid empty strings,
+  // false, zero, and null while removing only undefined fields.
+  const payload = Object.fromEntries(
+    Object.entries({
+      ...safeChanges,
+      updatedAt: new Date().toISOString(),
+    }).filter(([, value]) => value !== undefined),
+  ) as Partial<DocumentRecord>;
   if (firebaseConfigured && db) {
     await updateDoc(doc(db, "documents", id), payload);
     return;

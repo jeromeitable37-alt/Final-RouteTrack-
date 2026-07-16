@@ -34,7 +34,6 @@ import {
   migrateLegacyDocuments,
   subscribeActivityLogs,
   subscribeAllDocuments,
-  subscribeDocuments,
   subscribeUsers,
   updateDocument,
   updateManagedUser,
@@ -95,12 +94,15 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
     setLoading(true);
     void migrateLegacyDocuments(user).catch(() => undefined).finally(() => {
       if (cancelled) return;
-      unsubscribe = isAdmin
-        ? subscribeAllDocuments((items) => { setDocuments(items); setLoading(false); })
-        : subscribeDocuments(user.uid, (items) => { setDocuments(items); setLoading(false); });
+      // RouteTrack is one shared Purchasing Department workspace.
+      // Every active Student Assistant sees the same live document register.
+      unsubscribe = subscribeAllDocuments((items) => {
+        setDocuments(items);
+        setLoading(false);
+      });
     });
     return () => { cancelled = true; unsubscribe(); };
-  }, [user.uid, user.displayName, user.email, isAdmin]);
+  }, [user.uid, user.displayName, user.email]);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -389,7 +391,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
     }
   }
 
-  const viewTitle = view === "dashboard" ? (isAdmin ? "Administrator dashboard" : "My routing dashboard")
+  const viewTitle = view === "dashboard" ? "Purchasing Department workspace"
     : view === "documents" ? "Document register"
       : view === "routes" ? "Routing history"
         : view === "alerts" ? "Documents to check"
@@ -453,13 +455,13 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
           </section>
         </div>}
 
-        {view === "documents" && <div className="page-section"><section className="panel"><Filters search={search} setSearch={setSearch} typeFilter={typeFilter} setTypeFilter={setTypeFilter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onExport={exportDocuments} /><DocumentTable documents={filteredDocuments} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={isAdmin} userMap={userMap} requestCounts={requestCounts} /></section></div>}
+        {view === "documents" && <div className="page-section"><section className="panel"><Filters search={search} setSearch={setSearch} typeFilter={typeFilter} setTypeFilter={setTypeFilter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onExport={exportDocuments} /><DocumentTable documents={filteredDocuments} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={true} userMap={userMap} requestCounts={requestCounts} /></section></div>}
 
-        {view === "routes" && <div className="page-section"><section className="routing-explainer"><div><p className="eyebrow">CHAIN OF CUSTODY</p><h2>Each handoff keeps the exact date, time, person, and office.</h2><p>Open any record to add the next route or check the complete history.</p></div><Clock3 size={42} /></section><section className="panel"><Filters search={search} setSearch={setSearch} typeFilter={typeFilter} setTypeFilter={setTypeFilter} onExport={exportRoutes} /><RoutingTable documents={filteredRoutes} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={isAdmin} userMap={userMap} /></section></div>}
+        {view === "routes" && <div className="page-section"><section className="routing-explainer"><div><p className="eyebrow">CHAIN OF CUSTODY</p><h2>Each handoff keeps the exact date, time, person, and office.</h2><p>Open any record to add the next route or check the complete history.</p></div><Clock3 size={42} /></section><section className="panel"><Filters search={search} setSearch={setSearch} typeFilter={typeFilter} setTypeFilter={setTypeFilter} onExport={exportRoutes} /><RoutingTable documents={filteredRoutes} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={true} userMap={userMap} /></section></div>}
 
         {view === "alerts" && <div className="page-section"><section className="alert-summary-grid"><MiniMetric label="Missing" value={missing.length} /><MiniMetric label="No acknowledgment" value={unacknowledged.length} /><MiniMetric label="Over 3 days" value={stalled.length} /><MiniMetric label="Duplicate numbers" value={duplicates.length} /></section><section className="panel"><div className="panel-heading"><h2>Documents needing follow-up</h2></div>{alerts.length ? <div className="alert-card-grid">{alerts.map((item) => <button className="alert-card" key={item.id} onClick={() => setSelectedId(item.id)}><div className="alert-icon"><AlertTriangle size={20} /></div><div><strong>{item.type} {item.requestNo}</strong><span>Current: {item.currentHolder}</span><p>{normalizeStatus(item.status) === "missing" ? "Marked missing" : unacknowledged.some((route) => route.id === item.id) ? "No acknowledgment after one day" : stalled.some((route) => route.id === item.id) ? "Stayed with the current holder for over three days" : "Duplicate number"}</p></div></button>)}</div> : <div className="empty-panel success-empty">No routing exceptions detected.</div>}</section></div>}
 
-        {view === "archive" && <div className="page-section"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">SOFT DELETE</p><h2>Archived documents</h2></div><span>{archivedDocuments.length} record{archivedDocuments.length === 1 ? "" : "s"}</span></div><DocumentTable documents={archivedDocuments} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={isAdmin} userMap={userMap} requestCounts={{}} /></section></div>}
+        {view === "archive" && <div className="page-section"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">SOFT DELETE</p><h2>Archived documents</h2></div><span>{archivedDocuments.length} record{archivedDocuments.length === 1 ? "" : "s"}</span></div><DocumentTable documents={archivedDocuments} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={true} userMap={userMap} requestCounts={{}} /></section></div>}
 
         {view === "activity" && <div className="page-section"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">AUDIT TRAIL</p><h2>{isAdmin ? "System activity" : "My activity"}</h2></div></div><ActivityList activities={activities} full /></section></div>}
 

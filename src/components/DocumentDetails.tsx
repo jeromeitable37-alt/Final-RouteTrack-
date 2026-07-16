@@ -139,7 +139,7 @@ export function DocumentDetails({ user, document, onEdit, notify }: {
       const now = new Date().toISOString();
       await updateDocument(document.id, {
         status,
-        completedAt: status === "Completed" ? now : document.completedAt,
+        completedAt: status === "Completed" ? now : "",
       });
       await addActivityLog(user, "STATUS", `${document.type} ${document.requestNo}: ${note}`, document);
       notify(note);

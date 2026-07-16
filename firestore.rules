@@ -84,30 +84,29 @@ service cloud.firestore {
         && request.resource.data.ownerUid is string
         && (isAdmin() || request.resource.data.ownerUid == request.auth.uid);
 
-      allow read: if isActive()
-        && (isAdmin() || resource.data.ownerUid == request.auth.uid);
+      // One shared Purchasing Department register: every active account
+      // can view and update the same documents. Ownership remains unchanged
+      // so the original recorder is always traceable.
+      allow read: if isActive();
 
       allow update: if isActive()
-        && (isAdmin() || resource.data.ownerUid == request.auth.uid)
-        && request.resource.data.ownerUid == resource.data.ownerUid;
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          "ownerUid",
+          "ownerName",
+          "ownerEmail"
+        ]);
 
       // Documents use soft delete/archive so the audit trail is preserved.
       allow delete: if false;
 
       match /routes/{routeId} {
-        allow read: if isActive()
-          && (
-            isAdmin()
-            || get(/databases/$(database)/documents/documents/$(documentId)).data.ownerUid == request.auth.uid
-          );
+        // All active Purchasing users can read the chain of custody and
+        // add the next handoff. Each new route must identify the signed-in user.
+        allow read: if isActive();
 
         allow create: if isActive()
           && request.resource.data.documentId == documentId
-          && request.resource.data.createdByUid == request.auth.uid
-          && (
-            isAdmin()
-            || get(/databases/$(database)/documents/documents/$(documentId)).data.ownerUid == request.auth.uid
-          );
+          && request.resource.data.createdByUid == request.auth.uid;
 
         allow update: if false;
 
