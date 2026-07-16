@@ -39,6 +39,152 @@ const PURCHASING_EMPLOYEES = [
   "Jessa Ariscon",
 ];
 
+const SUPPLIERS = [
+  "Maximum Solutions Corporation",
+  "Amalgamated Specialties Corporation",
+  "Times Trading Co., Inc.",
+  "Jarm Printing Press",
+  "Oray Copier Solutions",
+  "Crown Supply Corporation",
+  "Creative Juice Digital Printing",
+  "Supertank Internatioanl Company",
+  "REX Bookstore, Inc.",
+  "Columbia Technologies, Inc.",
+  "Microsmith Technology System,Inc.",
+  "Leonard Prints Inc.",
+  "Farm Printing Press",
+  "Palces Manufacturing, Inc.",
+  "National Bookstore, Inc.",
+  "NTDC 888 Global Enterprise",
+  "C & E Publishing Inc.",
+  "Gift Republic, Inc.",
+  "Tropical Palms Fashion House, Inc.",
+  "Progressive Medical Corporation",
+  "Waller International, Inc.",
+  "Contrade Integrated Depot",
+  "iEquity Technologies Corp.",
+  "Print Depot Inc.",
+  "Rivchem Enterprises",
+  "Inkonvert Enterprises",
+  "Abacus Book & Card Corp.",
+  "Majesty Builders & Electrical Supply",
+  "Alpha-Cored Technology Systems, Inc.",
+  "Crosspoint Paper, Inc.",
+  "JAC Aluminum and Glass Supply and Services",
+  "Manila Rubber Corporation",
+  "National Bookstore",
+  "Soap King, Inc.",
+  "Chemtrust Global Market, Inc.",
+  "Officelandia Enterprises, Inc.",
+  "Philippine Blue Cross Biotech Corporation",
+  "Express Cards Enterprises Co.",
+  "Sprintec Printing Press, Inc.",
+  "EIG Metal Engravers",
+  "Wisechoice Cleaning Supplies and Trading Corp.",
+  "Polaris Prime Air Tech Corporation",
+  "Luminaire Printing And Publishing Corp.",
+  "Trojan Computer Forms Mfg. Corp.",
+  "Oxychem",
+  "Commerce Asia, Inc.",
+  "MMP Friendly Gift Ideas Store",
+  "Sert Technology Inc.",
+  "Hospeco Philippines, Inc.",
+  "Atlas Superflags",
+  "Net Ad IT Solutions",
+  "Arkin Hardware",
+  "Roavsan General Merchandise",
+  "PNB Credit Card",
+  "Brown Movement for Cultural Advancement, Inc.",
+  "Ahrcel's Gift Shop",
+  "Raynard's Enterprises",
+  "Paper Tree Marketing Group, Inc.",
+  "Marguerita Maria Nina I. Kanapi",
+  "Amazon",
+  "Belview Co., Inc.",
+  "Awardextremes, Inc.",
+  "Abenson Ventures, Inc.",
+  "JC Campit And Michael Berza",
+  "Arkwood Plus Fine Furniture",
+  "Sparklight Marketing Incorporated",
+  "Data Computer Forms, Inc.",
+  "DKL Laboratory Supplies",
+  "One Supply",
+  "Polaris Integrated Industries, Inc.",
+  "Falcon Waterfree Philippines, Inc.",
+  "Ergo Contracts Phil., Inc.",
+  "Hytec Power, Inc.",
+  "Lordfel Marketing",
+  "Forefront Book Co., Inc.",
+  "Booktrens Enterprises",
+  "EESM Bookstore",
+  "Marrbont Corporation",
+  "Ronald Personalized Fashion Specialist",
+  "Beyond Global Multiales Corp.",
+  "Printing Shop PrintPilipinas.com",
+  "Goldlink Indsutrial Sales",
+  "Mostaco Printing",
+  "EA Intertrade General Merchandising, Inc.",
+  "World Magazine Exchange Marketing Corp.",
+  "Chronos Athletics Shop",
+  "Circuitrocks Electronic Store",
+  "V.M Industries Corp.",
+  "ADBM Lightning Equipment Trading",
+  "Primeline Products Philippines, Inc.",
+  "Patagonian Enterprises",
+  "Dynamics Electrical Supply and Hardware",
+  "I-Stop Graphics and Business Center",
+  "RSAZ Corporation",
+  "JLY Garment Trading",
+  "Alpha Steel Office and Home Furnishing Company",
+  "Zariah's Non-Specialized Wholesale Trading",
+  "ULTRA PETRONNE INTERIOR SUPPLY CORPORATION",
+  "DOOPLO ADVERTISING",
+  "Abiva Publishing House, Inc.",
+  "CD Books International, Inc.",
+  "Javammp Printing Services",
+  "BIG LEAGUE SPORTS WEAR SHOP. INC.",
+  "Shelves and Cups Book Store",
+  "Litera Trading Inc.",
+  "Northwind Communications and Electronics",
+  "Philippine Chinese Education Research Center Inc.",
+  "Ma Espiritu Tiles Trading",
+  "Bobman Trading",
+  "Colent Marketing Philippines, Inc.",
+  "Elle Tech and Trend Office Furniture and Interiors",
+  "Montesan Enterprises",
+  "Ace Hardware",
+  "Tadeos Scientific Industries OPC",
+  "Velca Equipment And Engineered",
+  "Nathanizastef Corporate Giveaways Trading",
+  "Amson Pharmaceuticals",
+  "Mostaco Marketing",
+  "COMPUTECHNOLOGIES CORP.",
+  "Multiflex RNC Philippines inc.",
+  "Wilcon Depot Inc.",
+  "ARCHITRAVE TRADING",
+  "4David's Book Trading",
+  "Eprayim Granite and Marble Inc.",
+  "888 Tile Phil Corp",
+  "YKP General Merchandise",
+  "ECOSHIFT CORPORATION",
+  "Asahl Design Centre Inc.",
+  "Golden Advance Marketing",
+  "Jassen Harris  Industries Corp.",
+  "Almagated Specialties Corp.",
+  "Manos Allied Corporation",
+  "Philippine Educational Theater Association, Inc.",
+  "Bookquick Marketing",
+  "ASTC Electronics Services And Supply",
+  "O&J Global Trading",
+  "Gleam Multimedia  Post-Production SER",
+  "JMD International Corp",
+  "JW Summit Group Inc.",
+  "WS Pacific Publications Inc.",
+  "Eco Hygiene Institutional Sales Corp.",
+  "Barcaman Couture Corporation",
+  "Office Warehouse inc.",
+];
+
 function baseDocument(): DocumentInput {
   return {
     type: "PRF",
@@ -516,17 +662,17 @@ export function DocumentForm({
               />
             </label>
 
-            <label>
-              Supplier
-
-              <input
-                value={form.supplier || ""}
-                onChange={(event) =>
-                  update("supplier", event.target.value)
-                }
-                required
-              />
-            </label>
+            <SmartInput
+              label="Supplier"
+              value={form.supplier || ""}
+              options={SUPPLIERS}
+              onChange={(value) =>
+                update("supplier", value)
+              }
+              placeholder="Choose or type a supplier"
+              required
+              help="Select a supplier from the list or type another supplier."
+            />
 
             <label className="span-2">
               Description / items
@@ -575,17 +721,17 @@ export function DocumentForm({
               required
             />
 
-            <label>
-              Supplier
-
-              <input
-                value={form.supplier || ""}
-                onChange={(event) =>
-                  update("supplier", event.target.value)
-                }
-                required
-              />
-            </label>
+            <SmartInput
+              label="Supplier"
+              value={form.supplier || ""}
+              options={SUPPLIERS}
+              onChange={(value) =>
+                update("supplier", value)
+              }
+              placeholder="Choose or type a supplier"
+              required
+              help="Select a supplier from the list or type another supplier."
+            />
 
             <label>
               Purchasing employee
@@ -684,16 +830,16 @@ export function DocumentForm({
             />
           </label>
 
-          <label>
-            Supplier
-
-            <input
-              value={form.supplier || ""}
-              onChange={(event) =>
-                update("supplier", event.target.value)
-              }
-            />
-          </label>
+          <SmartInput
+            label="Supplier"
+            value={form.supplier || ""}
+            options={SUPPLIERS}
+            onChange={(value) =>
+              update("supplier", value)
+            }
+            placeholder="Choose or type a supplier"
+            help="Select a supplier from the list or type another supplier."
+          />
 
           <label className="span-2">
             Description / items
