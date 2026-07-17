@@ -60,6 +60,7 @@ import { ProfileForm } from "./ProfileForm";
 import { Avatar } from "./Avatar";
 import { InstallAppButton } from "./PwaSupport";
 import { MessagesPage } from "./MessagesPage";
+import { MonthlyDocumentsChart } from "./MonthlyDocumentsChart";
 
 type View = "dashboard" | "documents" | "routes" | "alerts" | "archive" | "activity" | "messages" | "users" | "profile";
 
@@ -445,6 +446,8 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
             <MiniMetric label="Pending follow-up" value={alerts.length} />
             <MiniMetric label="Staying over 3 days" value={stalled.length} />
           </section>
+
+          <MonthlyDocumentsChart documents={documents} />
 
           <section className="document-finder panel">
             <div className="finder-heading"><div><p className="eyebrow">WHERE IS THE DOCUMENT?</p><h2>Search by document number, approver, receiver, supplier, or office.</h2></div>{isAdmin && <button className="secondary-button" onClick={() => void exportBackup()}><HardDriveDownload size={16} /> Download backup</button>}</div>

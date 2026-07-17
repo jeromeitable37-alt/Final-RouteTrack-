@@ -1,0 +1,37 @@
+RouteTrack Live Monthly Document Chart
+
+Features:
+- Live January–December chart from the existing Firestore document subscription
+- Counts based on Date Requested
+- Fallback to Date Logged or record creation date for older records
+- PRF, SRF, CRF, and PO breakdown
+- Year selector
+- Total requested, busiest month, monthly average, and most requested type
+- Expandable exact monthly data table
+- Archived records remain included in historical totals
+- Admin chart shows all documents; staff chart follows their existing document visibility
+
+Replace:
+- src/components/AppShell.tsx
+- src/app/globals.css
+
+Add:
+- src/components/MonthlyDocumentsChart.tsx
+
+Steps:
+1. Back up the existing RouteTrack project.
+2. Extract this ZIP.
+3. Copy the included src folder into the root of the existing project.
+4. Choose Replace the files in the destination.
+5. Run:
+   npm run build
+6. Push to the same GitHub repository:
+   git add .
+   git commit -m "Add live monthly document charts"
+   git push origin main
+7. Wait for the existing Vercel deployment to become Ready.
+8. Refresh the deployed site with Ctrl + Shift + R.
+
+No npm install is required.
+No Firestore Rules update is required.
+No new Firebase collection is required.
