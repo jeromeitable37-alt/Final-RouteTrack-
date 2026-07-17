@@ -4,7 +4,8 @@ import { PwaRegister } from "@/components/PwaSupport";
 
 export const metadata: Metadata = {
   title: "RouteTrack — PRF, SRF, CRF and PO Monitoring",
-  description: "Mobile-friendly document routing and chain-of-custody monitoring for student assistants.",
+  description:
+    "Mobile-friendly document routing and chain-of-custody monitoring for student assistants.",
   applicationName: "RouteTrack",
 };
 
@@ -14,6 +15,39 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body><PwaRegister />{children}</body></html>;
+const themeInitializationScript = `
+  (() => {
+    try {
+      const saved = localStorage.getItem("routetrack-theme");
+      const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const theme = saved === "dark" || saved === "light"
+        ? saved
+        : systemDark
+          ? "dark"
+          : "light";
+
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.style.colorScheme = theme;
+    } catch (_) {
+      document.documentElement.dataset.theme = "light";
+    }
+  })();
+`;
+
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{ __html: themeInitializationScript }}
+        />
+      </head>
+      <body>
+        <PwaRegister />
+        {children}
+      </body>
+    </html>
+  );
 }

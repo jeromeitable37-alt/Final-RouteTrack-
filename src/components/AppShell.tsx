@@ -61,6 +61,7 @@ import { Avatar } from "./Avatar";
 import { InstallAppButton } from "./PwaSupport";
 import { MessagesPage } from "./MessagesPage";
 import { MonthlyDocumentsChart } from "./MonthlyDocumentsChart";
+import { ThemeToggle } from "./ThemeToggle";
 
 type View = "dashboard" | "documents" | "routes" | "alerts" | "archive" | "activity" | "messages" | "users" | "profile";
 
@@ -429,7 +430,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
       {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)} />}
 
       <main className="main-content">
-        <header className="topbar"><button className="menu-button" onClick={() => setMenuOpen(true)}><Menu size={20} /></button><div><p className="eyebrow">ROUTETRACK</p><h1>{viewTitle}</h1></div><div className="topbar-actions"><InstallAppButton />{view !== "users" && view !== "profile" && view !== "messages" && <button className="primary-button top-add" onClick={newDocument}><Plus size={17} /> Quick log</button>}</div></header>
+        <header className="topbar"><button className="menu-button" onClick={() => setMenuOpen(true)}><Menu size={20} /></button><div><p className="eyebrow">ROUTETRACK</p><h1>{viewTitle}</h1></div><div className="topbar-actions"><ThemeToggle /><InstallAppButton />{view !== "users" && view !== "profile" && view !== "messages" && <button className="primary-button top-add" onClick={newDocument}><Plus size={17} /> Quick log</button>}</div></header>
         {user.isDemo && <div className="demo-banner"><AlertTriangle size={17} /> Demo mode: records are stored only in this browser.</div>}
 
         {view === "dashboard" && <div className="page-section">

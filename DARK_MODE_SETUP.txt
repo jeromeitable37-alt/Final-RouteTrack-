@@ -1,0 +1,35 @@
+RouteTrack Persistent Dark Mode Patch
+
+Included enhancements:
+- Light and dark mode toggle on the login screen and dashboard header
+- Uses the device dark-mode preference on first visit
+- Remembers the selected theme in the browser
+- Updates the mobile browser theme color
+- Dark styling for dashboard cards, tables, forms, messages, charts, modals, and mobile navigation
+- Print view remains light for readable reports
+
+Replace:
+- src/app/layout.tsx
+- src/app/globals.css
+- src/components/AppShell.tsx
+- src/components/AuthScreen.tsx
+
+Add:
+- src/components/ThemeToggle.tsx
+
+Steps:
+1. Back up your existing RouteTrack project.
+2. Extract this ZIP.
+3. Copy the included src folder into the root of the existing project.
+4. Choose Replace the files in the destination.
+5. Run: npm run build
+6. Push to the same repository:
+   git add .
+   git commit -m "Add persistent dark mode"
+   git push origin main
+7. Wait for the existing Vercel deployment to become Ready.
+8. Refresh with Ctrl + Shift + R.
+
+No npm install is required.
+No Firestore Rules update is required.
+No new Firebase collection is required.

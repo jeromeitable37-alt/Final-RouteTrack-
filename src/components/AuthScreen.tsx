@@ -22,6 +22,7 @@ import {
 import { auth, db, firebaseConfigured } from "@/lib/firebase";
 import { SessionUser, UserProfile } from "@/lib/types";
 import { isBootstrapAdminEmail } from "@/lib/admin-config";
+import { ThemeToggle } from "./ThemeToggle";
 
 type AuthMode = "login" | "register" | "forgot-password";
 
@@ -190,6 +191,9 @@ export function AuthScreen({
 
   return (
     <main className="auth-page">
+      <div className="auth-theme-toggle">
+        <ThemeToggle showLabel />
+      </div>
       <section className="auth-brand-panel">
         <div className="auth-logo">
           <FileCheck2 size={30} />
