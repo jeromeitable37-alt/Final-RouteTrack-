@@ -75,11 +75,19 @@ export function DocumentDetails({ user, document, onEdit, notify }: {
   const normalizedStatus = String(document.status || "").trim().toLowerCase();
   const closed = normalizedStatus === "completed" || normalizedStatus === "cancelled";
   const archived = Boolean(document.archivedAt);
-  const canAcknowledge = !archived && !closed && !document.lastReceivedBy;
+  // New CRF/PO records stay In Transit until acknowledged. Older CRF/PO
+  // records that were auto-completed can still receive their missing acknowledgment.
+  const canAcknowledge =
+    !archived &&
+    !document.lastReceivedBy &&
+    (!closed || isSingleRouteDocument);
 
   async function saveRoute(input: RoutingInput) {
     if (isSingleRouteDocument) {
-      notify(`${document.type} is already Completed. No additional routing is required.`, true);
+      notify(
+        `${document.type} uses one routing entry only. Use Acknowledge to confirm receipt and complete the document.`,
+        true,
+      );
       return;
     }
 
@@ -117,20 +125,43 @@ export function DocumentDetails({ user, document, onEdit, notify }: {
 
   async function saveAcknowledgment(input: RoutingInput) {
     try {
+      const acknowledgmentStatus: DocumentRecord["status"] =
+        isSingleRouteDocument ? "Completed" : "Received";
+
+      const acknowledgmentTime =
+        input.dateTimeReceived || new Date().toISOString();
+
       await addRoute(user, document.id, input);
       await updateDocument(document.id, {
-        status: "Received",
+        status: acknowledgmentStatus,
+        completedAt: isSingleRouteDocument ? acknowledgmentTime : "",
         lastReceivedBy: input.receivedBy,
         lastReceivedAt: input.dateTimeReceived,
         lastMovementStatus: "Received",
         lastProofReference: input.proofReference,
         routeSearchText: `${document.routeSearchText || ""} ${routeSearchText(input)}`.trim(),
       });
-      await addActivityLog(user, "ACKNOWLEDGED", `${document.type} ${document.requestNo} received by ${input.receivedBy}.`, document);
+      await addActivityLog(
+        user,
+        "ACKNOWLEDGED",
+        isSingleRouteDocument
+          ? `${document.type} ${document.requestNo} received by ${input.receivedBy} and marked Completed.`
+          : `${document.type} ${document.requestNo} received by ${input.receivedBy}.`,
+        document,
+      );
       setAcknowledgmentOpen(false);
-      notify(`Receipt confirmed by ${input.receivedBy}.`);
+      notify(
+        isSingleRouteDocument
+          ? `Receipt confirmed by ${input.receivedBy}. ${document.type} is now Completed.`
+          : `Receipt confirmed by ${input.receivedBy}.`,
+      );
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Unable to save the acknowledgment.", true);
+      notify(
+        error instanceof Error
+          ? error.message
+          : "Unable to save the acknowledgment.",
+        true,
+      );
     }
   }
 
@@ -174,7 +205,7 @@ export function DocumentDetails({ user, document, onEdit, notify }: {
         <button className="secondary-button" onClick={() => window.print()}><Printer size={16} /> Print</button>
         {!archived && <button className="secondary-button" onClick={onEdit}><Edit3 size={16} /> Edit</button>}
         {canAcknowledge && <button className="secondary-button" onClick={() => setAcknowledgmentOpen(true)}><UserCheck size={16} /> Acknowledge</button>}
-        {!archived && normalizedStatus !== "completed" && <button className="status-action status-complete-action" onClick={() => void quickStatus("Completed", "Document marked Completed.")}><CheckCircle2 size={16} /> Completed</button>}
+        {!isSingleRouteDocument && !archived && normalizedStatus !== "completed" && <button className="status-action status-complete-action" onClick={() => void quickStatus("Completed", "Document marked Completed.")}><CheckCircle2 size={16} /> Completed</button>}
         {!archived && normalizedStatus !== "missing" && <button className="status-action status-missing-action" onClick={() => void quickStatus("Missing", "Document marked Missing for immediate follow-up.")}><ShieldAlert size={16} /> Missing</button>}
         {!archived && normalizedStatus !== "returned for correction" && <button className="secondary-button" onClick={() => void quickStatus("Returned for Correction", "Document marked Returned for Correction.")}><Undo2 size={16} /> Returned</button>}
         <button className="secondary-button" onClick={() => void toggleArchive()}>{archived ? <RotateCcw size={16} /> : <Archive size={16} />}{archived ? " Restore" : " Archive"}</button>
@@ -207,7 +238,7 @@ export function DocumentDetails({ user, document, onEdit, notify }: {
 
         <div className="current-location"><MapPin size={20} /><div><span>Current holder / office</span><strong>{document.currentHolder}</strong></div></div>
         {isSingleRouteDocument && (
-          <div className="remarks-box"><span>Routing status</span><p>{document.type} is completed after its first routing entry. No Route next action is required.</p></div>
+          <div className="remarks-box"><span>Routing status</span><p>{document.type} uses one routing entry only. Confirm the receiver through Acknowledge; the status will automatically become Completed. No Route next action is required.</p></div>
         )}
         {(document.itemsDescription || document.subjectPurpose) && <div className="remarks-box"><span>Description / items</span><p>{document.itemsDescription || document.subjectPurpose}</p></div>}
         {document.remarks && <div className="remarks-box"><span>Remarks</span><p>{document.remarks}</p></div>}

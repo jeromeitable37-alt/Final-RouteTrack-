@@ -252,7 +252,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
         notify("Document information updated.");
       } else {
         const owner = userMap.get(ownerUid) || user;
-        const automaticallyCompleted =
+        const isSingleRouteDocument =
           submission.document.type === "CRF" ||
           submission.document.type === "PO";
         const id = await addDocument(owner, submission.document);
@@ -260,8 +260,10 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
         await updateDocument(id, {
           routeCount: 1,
           currentHolder: submission.initialRoute.toOffice,
-          status: automaticallyCompleted ? "Completed" : "In Transit",
-          completedAt: automaticallyCompleted ? new Date().toISOString() : "",
+          // CRF and PO are single-route documents, but they remain
+          // In Transit until the receiving person is acknowledged.
+          status: "In Transit",
+          completedAt: "",
           lastRoutedAt: submission.initialRoute.dateTimeRouted,
           lastFromOffice: submission.initialRoute.fromOffice,
           lastToOffice: submission.initialRoute.toOffice,
@@ -283,8 +285,8 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
           requestNo: submission.document.requestNo,
         });
         notify(
-          automaticallyCompleted
-            ? `${submission.document.type} recorded and marked Completed. No additional routing is required.`
+          isSingleRouteDocument
+            ? `${submission.document.type} recorded. Confirm receipt to mark it Completed; no Route next action is required.`
             : "Document and first routing entry saved. Status: In Transit."
         );
       }
