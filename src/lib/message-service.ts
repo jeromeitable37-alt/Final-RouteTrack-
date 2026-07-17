@@ -1,14 +1,10 @@
 import {
-  addDoc,
   collection,
   doc,
-  getDoc,
   increment,
   onSnapshot,
   orderBy,
   query,
-  setDoc,
-  updateDoc,
   where,
   writeBatch,
 } from "firebase/firestore";
@@ -216,35 +212,34 @@ export async function sendDirectMessage(
   };
 
   if (firebaseConfigured && db) {
-    const conversationRef = doc(db, "conversations", conversationId);
-    const existing = await getDoc(conversationRef);
+    const firestore = db;
+    const conversationRef = doc(
+      firestore,
+      "conversations",
+      conversationId,
+    );
+    const messageRef = doc(collection(conversationRef, "messages"));
+    const batch = writeBatch(firestore);
 
-    if (!existing.exists()) {
-      await setDoc(conversationRef, {
+    // Use one atomic batch and merge the conversation record. This avoids
+    // reading a conversation before it exists, which security rules reject.
+    batch.set(
+      conversationRef,
+      {
         participantUids,
         participantNames,
         participantEmails,
         unreadCounts: {
-          [sender.uid]: 0,
-          [recipient.uid]: 1,
+          [recipient.uid]: increment(1),
         },
         lastMessage: text,
         lastSenderUid: sender.uid,
-        createdAt: now,
         updatedAt: now,
-      });
-    } else {
-      await updateDoc(conversationRef, {
-        participantNames,
-        participantEmails,
-        lastMessage: text,
-        lastSenderUid: sender.uid,
-        updatedAt: now,
-        [`unreadCounts.${recipient.uid}`]: increment(1),
-      });
-    }
+      },
+      { merge: true },
+    );
 
-    await addDoc(collection(conversationRef, "messages"), {
+    batch.set(messageRef, {
       conversationId,
       senderUid: sender.uid,
       senderName: sender.displayName || sender.email,
@@ -253,6 +248,8 @@ export async function sendDirectMessage(
       createdAt: now,
       readAt: "",
     });
+
+    await batch.commit();
     return;
   }
 

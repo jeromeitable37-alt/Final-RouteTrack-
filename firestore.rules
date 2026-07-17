@@ -130,7 +130,14 @@ service cloud.firestore {
       allow update: if isActive()
         && request.auth.uid in resource.data.participantUids
         && request.resource.data.participantUids == resource.data.participantUids
-        && request.resource.data.createdAt == resource.data.createdAt;
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "participantNames",
+          "participantEmails",
+          "unreadCounts",
+          "lastMessage",
+          "lastSenderUid",
+          "updatedAt"
+        ]);
 
       allow delete: if false;
 
@@ -138,10 +145,13 @@ service cloud.firestore {
         allow read: if isActive()
           && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantUids;
 
+        // getAfter() checks the conversation after the atomic batch is applied.
+        // This permits the first message and its new conversation to be
+        // created together without exposing other users' conversations.
         allow create: if isActive()
-          && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantUids
+          && request.auth.uid in getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.participantUids
           && request.resource.data.senderUid == request.auth.uid
-          && request.resource.data.recipientUid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantUids
+          && request.resource.data.recipientUid in getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.participantUids
           && request.resource.data.recipientUid != request.auth.uid
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
