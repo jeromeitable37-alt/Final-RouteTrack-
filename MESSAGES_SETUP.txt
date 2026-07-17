@@ -1,0 +1,43 @@
+ROUTETRACK MESSAGES PAGE UPDATE
+
+This patch adds secure real-time direct messages for the Purchasing Department.
+It updates the existing GitHub/Vercel deployment. Do not create a new project.
+
+FILES INCLUDED
+- src/components/AppShell.tsx
+- src/components/MessagesPage.tsx
+- src/lib/message-service.ts
+- src/lib/types.ts
+- src/app/globals.css
+- firestore.rules
+
+WHAT IT ADDS
+- Admin-to-staff, staff-to-admin, and staff-to-staff direct messages
+- Real-time chat using Firebase Firestore
+- User/contact search
+- Unread count on the sidebar and mobile navigation
+- Read indicator
+- Disabled accounts cannot be messaged
+- Only the two participants can read their conversation
+- Messages cannot be edited or deleted after sending
+
+INSTALL
+1. Back up the current RouteTrack folder.
+2. Extract the patch.
+3. Copy the included src folder and firestore.rules into the existing project root.
+4. Choose Replace files in the destination.
+5. Do not delete .git or .env.local.
+6. Run: npm run build
+7. Copy the new firestore.rules into Firebase Console > Firestore Database > Rules.
+8. Click Publish.
+9. Push to the same repository:
+   git add .
+   git commit -m "Add Purchasing team messages"
+   git push origin main
+10. Wait for the existing Vercel deployment to become Ready.
+11. Refresh with Ctrl + Shift + R.
+
+TEST
+- Open two accounts in different browsers or one normal and one Incognito window.
+- Account A sends a message to Account B.
+- Account B should see an unread number and the message in real time.

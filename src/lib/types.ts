@@ -153,6 +153,30 @@ export interface ActivityRecord {
   createdAt: string;
 }
 
+
+export interface ConversationRecord {
+  id: string;
+  participantUids: string[];
+  participantNames: Record<string, string>;
+  participantEmails: Record<string, string>;
+  unreadCounts: Record<string, number>;
+  lastMessage: string;
+  lastSenderUid: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DirectMessageRecord {
+  id: string;
+  conversationId: string;
+  senderUid: string;
+  senderName: string;
+  recipientUid: string;
+  text: string;
+  createdAt: string;
+  readAt: string;
+}
+
 export interface SessionUser extends UserProfile {
   isDemo?: boolean;
 }

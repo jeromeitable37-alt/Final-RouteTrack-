@@ -14,6 +14,7 @@ import {
   History,
   LogOut,
   Menu,
+  MessageCircle,
   Plus,
   Search,
   ShieldAlert,
@@ -25,6 +26,7 @@ import {
   X,
 } from "lucide-react";
 import { auth, firebaseConfigured } from "@/lib/firebase";
+import { subscribeUnreadMessageCount } from "@/lib/message-service";
 import {
   addActivityLog,
   addDocument,
@@ -34,6 +36,7 @@ import {
   migrateLegacyDocuments,
   subscribeActivityLogs,
   subscribeAllDocuments,
+  subscribeDocuments,
   subscribeUsers,
   updateDocument,
   updateManagedUser,
@@ -56,8 +59,9 @@ import { UserForm } from "./UserForm";
 import { ProfileForm } from "./ProfileForm";
 import { Avatar } from "./Avatar";
 import { InstallAppButton } from "./PwaSupport";
+import { MessagesPage } from "./MessagesPage";
 
-type View = "dashboard" | "documents" | "routes" | "alerts" | "archive" | "activity" | "users" | "profile";
+type View = "dashboard" | "documents" | "routes" | "alerts" | "archive" | "activity" | "messages" | "users" | "profile";
 
 function isAdminRole(role: unknown): boolean {
   return String(role || "").trim().toLowerCase() === "admin";
@@ -87,6 +91,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
   const [statusFilter, setStatusFilter] = useState("All");
   const [userSearch, setUserSearch] = useState("");
   const [toast, setToast] = useState<{ message: string; error?: boolean } | null>(null);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   useEffect(() => {
     let unsubscribe: () => void = () => {};
@@ -94,23 +99,19 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
     setLoading(true);
     void migrateLegacyDocuments(user).catch(() => undefined).finally(() => {
       if (cancelled) return;
-      // RouteTrack is one shared Purchasing Department workspace.
-      // Every active Student Assistant sees the same live document register.
-      unsubscribe = subscribeAllDocuments((items) => {
-        setDocuments(items);
-        setLoading(false);
-      });
+      unsubscribe = isAdmin
+        ? subscribeAllDocuments((items) => { setDocuments(items); setLoading(false); })
+        : subscribeDocuments(user.uid, (items) => { setDocuments(items); setLoading(false); });
     });
     return () => { cancelled = true; unsubscribe(); };
-  }, [user.uid, user.displayName, user.email]);
+  }, [user.uid, user.displayName, user.email, isAdmin]);
 
-  useEffect(() => {
-    if (!isAdmin) {
-      setUsers([user]);
-      return;
-    }
-    return subscribeUsers(setUsers);
-  }, [isAdmin, user]);
+  useEffect(() => subscribeUsers(setUsers), []);
+
+  useEffect(
+    () => subscribeUnreadMessageCount(user.uid, setUnreadMessages),
+    [user.uid],
+  );
 
   useEffect(() => subscribeActivityLogs(user, setActivities), [user.uid, user.role]);
 
@@ -391,14 +392,15 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
     }
   }
 
-  const viewTitle = view === "dashboard" ? "Purchasing Department workspace"
+  const viewTitle = view === "dashboard" ? (isAdmin ? "Administrator dashboard" : "My routing dashboard")
     : view === "documents" ? "Document register"
       : view === "routes" ? "Routing history"
         : view === "alerts" ? "Documents to check"
           : view === "archive" ? "Archived documents"
             : view === "activity" ? "Activity log"
-              : view === "users" ? "User management"
-                : "My profile";
+              : view === "messages" ? "Messages"
+                : view === "users" ? "User management"
+                  : "My profile";
 
   return (
     <div className="app-layout">
@@ -412,6 +414,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
           <button className={view === "alerts" ? "active" : ""} onClick={() => openView("alerts")}><ShieldAlert size={19} /> To check <span className={alerts.length ? "nav-alert" : ""}>{alerts.length}</span></button>
           <button className={view === "archive" ? "active" : ""} onClick={() => openView("archive")}><Archive size={19} /> Archive <span>{archivedDocuments.length}</span></button>
           <button className={view === "activity" ? "active" : ""} onClick={() => openView("activity")}><History size={19} /> Activity <span>{activities.length}</span></button>
+          <button className={view === "messages" ? "active" : ""} onClick={() => openView("messages")}><MessageCircle size={19} /> Messages {unreadMessages > 0 && <span className="nav-alert">{unreadMessages}</span>}</button>
           {isAdmin && <button className={view === "users" ? "active" : ""} onClick={() => openView("users")}><Users size={19} /> Users <span>{users.length}</span></button>}
           <button className={view === "profile" ? "active" : ""} onClick={() => openView("profile")}><UserRound size={19} /> My profile</button>
         </nav>
@@ -423,7 +426,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
       {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)} />}
 
       <main className="main-content">
-        <header className="topbar"><button className="menu-button" onClick={() => setMenuOpen(true)}><Menu size={20} /></button><div><p className="eyebrow">ROUTETRACK</p><h1>{viewTitle}</h1></div><div className="topbar-actions"><InstallAppButton />{view !== "users" && view !== "profile" && <button className="primary-button top-add" onClick={newDocument}><Plus size={17} /> Quick log</button>}</div></header>
+        <header className="topbar"><button className="menu-button" onClick={() => setMenuOpen(true)}><Menu size={20} /></button><div><p className="eyebrow">ROUTETRACK</p><h1>{viewTitle}</h1></div><div className="topbar-actions"><InstallAppButton />{view !== "users" && view !== "profile" && view !== "messages" && <button className="primary-button top-add" onClick={newDocument}><Plus size={17} /> Quick log</button>}</div></header>
         {user.isDemo && <div className="demo-banner"><AlertTriangle size={17} /> Demo mode: records are stored only in this browser.</div>}
 
         {view === "dashboard" && <div className="page-section">
@@ -455,23 +458,25 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
           </section>
         </div>}
 
-        {view === "documents" && <div className="page-section"><section className="panel"><Filters search={search} setSearch={setSearch} typeFilter={typeFilter} setTypeFilter={setTypeFilter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onExport={exportDocuments} /><DocumentTable documents={filteredDocuments} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={true} userMap={userMap} requestCounts={requestCounts} /></section></div>}
+        {view === "documents" && <div className="page-section"><section className="panel"><Filters search={search} setSearch={setSearch} typeFilter={typeFilter} setTypeFilter={setTypeFilter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onExport={exportDocuments} /><DocumentTable documents={filteredDocuments} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={isAdmin} userMap={userMap} requestCounts={requestCounts} /></section></div>}
 
-        {view === "routes" && <div className="page-section"><section className="routing-explainer"><div><p className="eyebrow">CHAIN OF CUSTODY</p><h2>Each handoff keeps the exact date, time, person, and office.</h2><p>Open any record to add the next route or check the complete history.</p></div><Clock3 size={42} /></section><section className="panel"><Filters search={search} setSearch={setSearch} typeFilter={typeFilter} setTypeFilter={setTypeFilter} onExport={exportRoutes} /><RoutingTable documents={filteredRoutes} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={true} userMap={userMap} /></section></div>}
+        {view === "routes" && <div className="page-section"><section className="routing-explainer"><div><p className="eyebrow">CHAIN OF CUSTODY</p><h2>Each handoff keeps the exact date, time, person, and office.</h2><p>Open any record to add the next route or check the complete history.</p></div><Clock3 size={42} /></section><section className="panel"><Filters search={search} setSearch={setSearch} typeFilter={typeFilter} setTypeFilter={setTypeFilter} onExport={exportRoutes} /><RoutingTable documents={filteredRoutes} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={isAdmin} userMap={userMap} /></section></div>}
 
         {view === "alerts" && <div className="page-section"><section className="alert-summary-grid"><MiniMetric label="Missing" value={missing.length} /><MiniMetric label="No acknowledgment" value={unacknowledged.length} /><MiniMetric label="Over 3 days" value={stalled.length} /><MiniMetric label="Duplicate numbers" value={duplicates.length} /></section><section className="panel"><div className="panel-heading"><h2>Documents needing follow-up</h2></div>{alerts.length ? <div className="alert-card-grid">{alerts.map((item) => <button className="alert-card" key={item.id} onClick={() => setSelectedId(item.id)}><div className="alert-icon"><AlertTriangle size={20} /></div><div><strong>{item.type} {item.requestNo}</strong><span>Current: {item.currentHolder}</span><p>{normalizeStatus(item.status) === "missing" ? "Marked missing" : unacknowledged.some((route) => route.id === item.id) ? "No acknowledgment after one day" : stalled.some((route) => route.id === item.id) ? "Stayed with the current holder for over three days" : "Duplicate number"}</p></div></button>)}</div> : <div className="empty-panel success-empty">No routing exceptions detected.</div>}</section></div>}
 
-        {view === "archive" && <div className="page-section"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">SOFT DELETE</p><h2>Archived documents</h2></div><span>{archivedDocuments.length} record{archivedDocuments.length === 1 ? "" : "s"}</span></div><DocumentTable documents={archivedDocuments} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={true} userMap={userMap} requestCounts={{}} /></section></div>}
+        {view === "archive" && <div className="page-section"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">SOFT DELETE</p><h2>Archived documents</h2></div><span>{archivedDocuments.length} record{archivedDocuments.length === 1 ? "" : "s"}</span></div><DocumentTable documents={archivedDocuments} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={isAdmin} userMap={userMap} requestCounts={{}} /></section></div>}
 
         {view === "activity" && <div className="page-section"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">AUDIT TRAIL</p><h2>{isAdmin ? "System activity" : "My activity"}</h2></div></div><ActivityList activities={activities} full /></section></div>}
+
+        {view === "messages" && <div className="page-section messages-section"><MessagesPage user={user} users={users} notify={notify} /></div>}
 
         {view === "users" && isAdmin && <div className="page-section"><section className="metric-grid user-metric-grid"><Metric label="Total accounts" value={users.length} note="Registered profiles" /><Metric label="Active" value={users.filter((item) => item.active).length} note="Can use the system" positive /><Metric label="Administrators" value={users.filter((item) => isAdminRole(item.role)).length} note="Full access" /><Metric label="Disabled" value={users.filter((item) => !item.active).length} note="Access blocked" alert={users.some((item) => !item.active)} /></section><section className="panel"><div className="user-toolbar"><div className="search-box"><Search size={18} /><input placeholder="Search name, department, position…" value={userSearch} onChange={(event) => setUserSearch(event.target.value)} /></div><button className="primary-button" onClick={newUser}><UserPlus size={17} /> Create account</button></div><UserTable users={filteredUsers} currentUid={user.uid} documentCounts={documents.reduce<Record<string, number>>((acc, item) => { acc[item.ownerUid] = (acc[item.ownerUid] || 0) + 1; return acc; }, {})} onEdit={editUser} /></section></div>}
 
         {view === "profile" && <div className="page-section profile-page"><section className="panel profile-panel"><div className="profile-heading"><Avatar name={user.displayName} photoDataUrl={user.photoDataUrl} size="large" /><div><p className="eyebrow">USER PROFILE</p><h2>{user.displayName}</h2><span>{user.email}</span></div></div><ProfileForm profile={user} onSubmit={saveProfile} /></section></div>}
       </main>
 
-      {view === "users" && isAdmin ? <button className="mobile-fab" onClick={newUser}><UserPlus size={22} /></button> : view !== "profile" && <button className="mobile-fab" onClick={newDocument}><FilePlus2 size={22} /></button>}
-      <nav className={`mobile-nav ${isAdmin ? "mobile-nav-admin" : ""}`}><button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}><BarChart3 size={19} /><span>Home</span></button><button className={view === "documents" ? "active" : ""} onClick={() => setView("documents")}><ClipboardList size={19} /><span>Documents</span></button><button className={view === "routes" ? "active" : ""} onClick={() => setView("routes")}><Clock3 size={19} /><span>Routes</span></button><button className={view === "alerts" ? "active" : ""} onClick={() => setView("alerts")}><ShieldAlert size={19} /><span>Check</span></button>{isAdmin && <button className={view === "users" ? "active" : ""} onClick={() => setView("users")}><Users size={19} /><span>Users</span></button>}</nav>
+      {view === "users" && isAdmin ? <button className="mobile-fab" onClick={newUser}><UserPlus size={22} /></button> : view !== "profile" && view !== "messages" && <button className="mobile-fab" onClick={newDocument}><FilePlus2 size={22} /></button>}
+      <nav className={`mobile-nav ${isAdmin ? "mobile-nav-admin" : ""}`}><button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}><BarChart3 size={19} /><span>Home</span></button><button className={view === "documents" ? "active" : ""} onClick={() => setView("documents")}><ClipboardList size={19} /><span>Documents</span></button><button className={view === "routes" ? "active" : ""} onClick={() => setView("routes")}><Clock3 size={19} /><span>Routes</span></button><button className={view === "alerts" ? "active" : ""} onClick={() => setView("alerts")}><ShieldAlert size={19} /><span>Check</span></button><button className={view === "messages" ? "active" : ""} onClick={() => setView("messages")}><MessageCircle size={19} /><span>Messages{unreadMessages > 0 ? ` (${unreadMessages})` : ""}</span></button>{isAdmin && <button className={view === "users" ? "active" : ""} onClick={() => setView("users")}><Users size={19} /><span>Users</span></button>}</nav>
 
       {formOpen && <Modal title={editing ? "Edit document" : "Quick routing log"} onClose={() => { setFormOpen(false); setEditing(null); }} wide><DocumentForm document={editing} existingDocuments={documents.map((item) => ({ id: item.id, type: item.type, requestNo: item.requestNo }))} ownerOptions={isAdmin ? activeOwnerOptions : undefined} ownerUid={ownerUid} onOwnerChange={setOwnerUid} onSubmit={saveDocument} onCancel={() => { setFormOpen(false); setEditing(null); }} /></Modal>}
       {selected && <Modal title={`${selected.type} ${selected.requestNo}`} onClose={() => setSelectedId(null)} wide><DocumentDetails user={user} document={{ ...selected, ownerName: userMap.get(selected.ownerUid)?.displayName || selected.ownerName, ownerEmail: userMap.get(selected.ownerUid)?.email || selected.ownerEmail }} onEdit={() => { setSelectedId(null); editDocument(selected); }} notify={notify} /></Modal>}
