@@ -307,19 +307,36 @@ export async function markConversationRead(
   );
 
   if (firebaseConfigured && db) {
-    const conversationRef = doc(db, "conversations", conversationId);
-    const batch = writeBatch(db);
+    // Store the narrowed Firestore instance in a local constant.
+    // TypeScript does not always preserve `db !== null` inside callbacks.
+    const firestore = db;
+
+    const conversationRef = doc(
+      firestore,
+      "conversations",
+      conversationId,
+    );
+
+    const batch = writeBatch(firestore);
+
     batch.update(conversationRef, {
       [`unreadCounts.${userUid}`]: 0,
     });
 
     const readAt = new Date().toISOString();
+
     unread.forEach((item) => {
-      batch.update(
-        doc(db, "conversations", conversationId, "messages", item.id),
-        { readAt },
+      const messageRef = doc(
+        firestore,
+        "conversations",
+        conversationId,
+        "messages",
+        item.id,
       );
+
+      batch.update(messageRef, { readAt });
     });
+
     await batch.commit();
     return;
   }
