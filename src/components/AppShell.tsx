@@ -76,6 +76,7 @@ import { QrScannerPage } from "./QrScannerPage";
 import { ReportsPage } from "./ReportsPage";
 import { ShiftHandoverPage } from "./ShiftHandoverPage";
 import { IdleSessionGuard, OnlineStatus, SecurityPage } from "./SecurityAndOffline";
+import { sendPushNotification } from "@/lib/push-notifications";
 
 type View = "dashboard" | "documents" | "routes" | "alerts" | "archive" | "activity" | "messages" | "reports" | "scanner" | "handover" | "security" | "users" | "profile";
 
@@ -110,6 +111,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<Set<string>>(new Set());
   const [lastBackupAt, setLastBackupAt] = useState("");
+  const [messageContactUid, setMessageContactUid] = useState("");
 
   useEffect(() => {
     let unsubscribe: () => void = () => {};
@@ -159,8 +161,21 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
   }, [documents]);
 
   useEffect(() => {
-    if (!documents.length || typeof window === "undefined") return;
-    const requestedId = new URLSearchParams(window.location.search).get("document");
+    if (typeof window === "undefined") return;
+    const parameters = new URLSearchParams(window.location.search);
+    const requestedView = parameters.get("view");
+    const allowedViews: View[] = [
+      "dashboard", "documents", "routes", "alerts", "archive", "activity",
+      "messages", "reports", "scanner", "handover", "security", "profile",
+    ];
+    if (requestedView && allowedViews.includes(requestedView as View)) {
+      setView(requestedView as View);
+    }
+    const contact = parameters.get("contact") || "";
+    if (contact) setMessageContactUid(contact);
+
+    if (!documents.length) return;
+    const requestedId = parameters.get("document");
     if (requestedId && documents.some((item) => item.id === requestedId)) {
       setSelectedId(requestedId);
       setView("documents");
@@ -268,11 +283,28 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
   function newUser() { setEditingUser(null); setUserFormOpen(true); }
   function editUser(profile: UserProfile) { setEditingUser(profile); setUserFormOpen(true); }
 
+  function notifyDocumentUpdate(target: { id: string; type: string; requestNo: string; ownerUid: string }, title: string, body: string) {
+    const destination = isAdmin && target.ownerUid !== user.uid
+      ? { recipientUid: target.ownerUid }
+      : !isAdmin
+        ? { recipientRole: "admin" as const }
+        : null;
+    if (!destination) return;
+    void sendPushNotification({
+      ...destination,
+      title,
+      body,
+      url: `/?document=${encodeURIComponent(target.id)}`,
+      category: "document",
+    }).catch(() => undefined);
+  }
+
   async function saveDocument(submission: DocumentSubmission) {
     try {
       if (editing) {
         await updateDocument(editing.id, submission.document);
         await addActivityLog(user, "EDITED", `${editing.type} ${editing.requestNo} information updated.`, editing);
+        notifyDocumentUpdate(editing, `${editing.type} ${editing.requestNo} updated`, `${user.displayName || user.email} updated the document information.`);
         notify("Document information updated.");
       } else {
         const owner = userMap.get(ownerUid) || user;
@@ -308,6 +340,11 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
           type: submission.document.type,
           requestNo: submission.document.requestNo,
         });
+        notifyDocumentUpdate(
+          { id, type: submission.document.type, requestNo: submission.document.requestNo, ownerUid: owner.uid },
+          `${submission.document.type} ${submission.document.requestNo} routed`,
+          `${user.displayName || user.email} routed the document to ${submission.initialRoute.toOffice}.`,
+        );
         notify(
           isSingleRouteDocument
             ? `${submission.document.type} recorded. Confirm receipt to mark it Completed; no Route next action is required.`
@@ -521,7 +558,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
       {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)} />}
 
       <main className="main-content">
-        <header className="topbar"><button className="menu-button" onClick={() => setMenuOpen(true)}><Menu size={20} /></button><div className="topbar-title"><p className="eyebrow">ROUTETRACK</p><h1>{viewTitle}</h1></div><CommandPalette documents={visibleDocuments} actions={commandActions} onOpenDocument={(id) => { setSelectedId(id); setView("documents"); }} /><div className="topbar-actions"><OnlineStatus /><NotificationCenter documents={visibleDocuments} unreadMessages={unreadMessages} onOpenDocument={(id) => { setSelectedId(id); setView("documents"); }} onOpenMessages={() => setView("messages")} /><ThemeToggle /><InstallAppButton />{view !== "users" && view !== "profile" && view !== "messages" && view !== "security" && <button className="primary-button top-add" onClick={newDocument}><Plus size={17} /> Quick log</button>}</div></header>
+        <header className="topbar"><button className="menu-button" onClick={() => setMenuOpen(true)}><Menu size={20} /></button><div className="topbar-title"><p className="eyebrow">ROUTETRACK</p><h1>{viewTitle}</h1></div><CommandPalette documents={visibleDocuments} actions={commandActions} onOpenDocument={(id) => { setSelectedId(id); setView("documents"); }} /><div className="topbar-actions"><OnlineStatus /><NotificationCenter user={user} notify={notify} documents={visibleDocuments} unreadMessages={unreadMessages} onOpenDocument={(id) => { setSelectedId(id); setView("documents"); }} onOpenMessages={() => setView("messages")} /><ThemeToggle /><InstallAppButton />{view !== "users" && view !== "profile" && view !== "messages" && view !== "security" && <button className="primary-button top-add" onClick={newDocument}><Plus size={17} /> Quick log</button>}</div></header>
         {user.isDemo && <div className="demo-banner"><AlertTriangle size={17} /> Demo mode: records are stored only in this browser.</div>}
 
         {view === "dashboard" && <div className="page-section">
@@ -571,7 +608,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
 
         {view === "activity" && <div className="page-section"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">AUDIT TRAIL</p><h2>{isAdmin ? "System activity" : "My activity"}</h2></div></div><ActivityList activities={activities} full /></section></div>}
 
-        {view === "messages" && <div className="page-section messages-section"><MessagesPage user={user} users={users} notify={notify} /></div>}
+        {view === "messages" && <div className="page-section messages-section"><MessagesPage user={user} users={users} notify={notify} initialContactUid={messageContactUid} /></div>}
 
         {view === "reports" && <ReportsPage documents={visibleDocuments} user={user} notify={notify} onOpenDocument={(id) => { setSelectedId(id); setView("documents"); }} />}
 

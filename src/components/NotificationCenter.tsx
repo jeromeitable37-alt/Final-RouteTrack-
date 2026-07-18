@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bell, BellRing, CheckCircle2, MessageCircle, ShieldAlert, X } from "lucide-react";
-import { DocumentRecord } from "@/lib/types";
+import { DocumentRecord, SessionUser } from "@/lib/types";
+import { PushNotificationSettings } from "./PushNotificationSettings";
 
 interface NotificationItem {
   id: string;
@@ -26,11 +27,15 @@ export function NotificationCenter({
   unreadMessages,
   onOpenDocument,
   onOpenMessages,
+  user,
+  notify,
 }: {
   documents: DocumentRecord[];
   unreadMessages: number;
   onOpenDocument: (id: string) => void;
   onOpenMessages: () => void;
+  user: SessionUser;
+  notify: (message: string, error?: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState<string[]>([]);
@@ -58,14 +63,6 @@ export function NotificationCenter({
     return generated.filter((item) => !dismissed.includes(item.id)).slice(0, 30);
   }, [documents, dismissed, unreadMessages]);
 
-  useEffect(() => {
-    if (!items.length || typeof Notification === "undefined" || Notification.permission !== "granted") return;
-    const first = items[0];
-    const last = localStorage.getItem("routetrack-last-browser-notification");
-    if (last === first.id) return;
-    new Notification(first.title, { body: first.body, tag: first.id });
-    localStorage.setItem("routetrack-last-browser-notification", first.id);
-  }, [items]);
 
   function dismiss(id: string) {
     const next = [...dismissed, id].slice(-100);
@@ -73,10 +70,6 @@ export function NotificationCenter({
     localStorage.setItem("routetrack-dismissed-notifications", JSON.stringify(next));
   }
 
-  async function enableBrowserNotifications() {
-    if (typeof Notification === "undefined") return;
-    await Notification.requestPermission();
-  }
 
   return (
     <div className="notification-center" ref={panelRef}>
@@ -87,9 +80,7 @@ export function NotificationCenter({
       {open && (
         <section className="notification-popover">
           <header><div><p className="eyebrow">NOTIFICATIONS</p><h3>What needs attention</h3></div><button className="icon-button" onClick={() => setOpen(false)}><X size={17} /></button></header>
-          {typeof Notification !== "undefined" && Notification.permission === "default" && (
-            <button className="notification-permission" onClick={() => void enableBrowserNotifications()}><Bell size={16} /> Enable browser alerts</button>
-          )}
+          <PushNotificationSettings user={user} notify={notify} />
           <div className="notification-list">
             {items.map((item) => (
               <article key={item.id} className={`notification-item notification-${item.severity}`}>

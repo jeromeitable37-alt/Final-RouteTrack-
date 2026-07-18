@@ -25,16 +25,16 @@ export const firebaseConfigured = Boolean(
     firebaseConfig.appId,
 );
 
-let app: FirebaseApp | null = null;
+export let firebaseApp: FirebaseApp | null = null;
 export let auth: Auth | null = null;
 export let db: Firestore | null = null;
 
 if (firebaseConfigured) {
-  app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-  auth = getAuth(app);
+  firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+  auth = getAuth(firebaseApp);
 
   try {
-    db = initializeFirestore(app, {
+    db = initializeFirestore(firebaseApp, {
       localCache: persistentLocalCache({
         tabManager: persistentMultipleTabManager(),
       }),
@@ -43,10 +43,10 @@ if (firebaseConfigured) {
     // Fall back to memory cache when IndexedDB persistence is unavailable,
     // blocked by the browser, or Firestore was already initialized.
     try {
-      db = initializeFirestore(app, { localCache: memoryLocalCache() });
+      db = initializeFirestore(firebaseApp, { localCache: memoryLocalCache() });
     } catch {
       // A previous initialization may already own the Firestore instance.
-      db = getFirestore(app);
+      db = getFirestore(firebaseApp);
     }
   }
 }

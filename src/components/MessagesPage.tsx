@@ -27,16 +27,19 @@ import {
   UserProfile,
 } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
+import { sendPushNotification } from "@/lib/push-notifications";
 import { Avatar } from "./Avatar";
 
 export function MessagesPage({
   user,
   users,
   notify,
+  initialContactUid = "",
 }: {
   user: SessionUser;
   users: UserProfile[];
   notify: (message: string, error?: boolean) => void;
+  initialContactUid?: string;
 }) {
   const [conversations, setConversations] = useState<ConversationRecord[]>([]);
   const [selectedUid, setSelectedUid] = useState("");
@@ -67,6 +70,12 @@ export function MessagesPage({
   const selectedConversation = selectedUid
     ? conversations.find((item) => item.participantUids.includes(selectedUid)) || null
     : null;
+
+  useEffect(() => {
+    if (initialContactUid && contacts.some((item) => item.uid === initialContactUid)) {
+      setSelectedUid(initialContactUid);
+    }
+  }, [contacts, initialContactUid]);
 
   useEffect(
     () => subscribeConversations(user.uid, setConversations),
@@ -116,8 +125,16 @@ export function MessagesPage({
 
     setSending(true);
     try {
-      await sendDirectMessage(user, selectedContact, draft);
+      const messageText = draft.trim();
+      await sendDirectMessage(user, selectedContact, messageText);
       setDraft("");
+      void sendPushNotification({
+        recipientUid: selectedContact.uid,
+        title: `New message from ${user.displayName || user.email}`,
+        body: messageText.length > 150 ? `${messageText.slice(0, 147)}…` : messageText,
+        url: `/?view=messages&contact=${encodeURIComponent(user.uid)}`,
+        category: "message",
+      }).catch(() => undefined);
     } catch (error) {
       notify(
         error instanceof Error ? error.message : "Unable to send the message.",

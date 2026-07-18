@@ -11,7 +11,7 @@ type InstallPromptEvent = Event & {
 export function PwaRegister() {
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+      void navigator.serviceWorker.register("/firebase-messaging-sw", { scope: "/" }).catch(() => undefined);
     }
   }, []);
   return null;

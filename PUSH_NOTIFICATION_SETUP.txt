@@ -1,0 +1,173 @@
+ROUTETRACK MESSENGER-STYLE PUSH NOTIFICATIONS
+
+This updates the existing RouteTrack GitHub and Vercel project.
+Do not create another repository, Firebase project, or Vercel project.
+
+WHAT IT ADDS
+- Lock-screen and notification-tray alerts
+- Background notification support
+- New direct-message notifications
+- Document created, edited, routed, acknowledged, returned, completed,
+  missing, archived, and restored notifications
+- Admin receives important actions made by Student Assistants
+- A Student Assistant receives updates made by Admin to their document
+- Tap notification to open the exact conversation or document
+- Enable, Disable, and Test buttons inside the notification panel
+- Multi-device support per account
+- App badge support on compatible installed web apps
+- Android and iPhone/iPad instructions
+
+IMPORTANT
+- Each user must enable notifications separately on each phone or computer.
+- iPhone/iPad users must first add RouteTrack to the Home Screen.
+- Service-account credentials are secret. Never commit them to GitHub,
+  paste them in chat, or place them in NEXT_PUBLIC variables.
+- This patch requires Node.js 22 because Firebase Admin 14 requires Node 22.
+
+FILES
+The patch replaces or adds the files listed in the ZIP.
+It intentionally does not include package-lock.json.
+Running npm install will safely update package-lock.json on your computer.
+
+STEP 1 — BACK UP
+Make a copy of the current RouteTrack project folder.
+
+STEP 2 — COPY PATCH
+1. Extract RouteTrack_Messenger_Style_Push_Notifications_Patch.zip.
+2. Copy everything inside the extracted folder.
+3. Paste it into the root of the existing RouteTrack project.
+4. Choose Replace the files in the destination.
+5. Keep the existing .git folder and .env.local file.
+
+STEP 3 — CHECK NODE
+Run:
+  node -v
+
+It should show v22.x.x.
+
+STEP 4 — INSTALL FIREBASE ADMIN
+Run:
+  npm config set registry https://registry.npmjs.org/
+  npm install firebase-admin@14.1.0
+
+This updates package-lock.json.
+
+STEP 5 — CREATE FIREBASE WEB PUSH KEY
+1. Open Firebase Console.
+2. Open the existing files-monitoring project.
+3. Project Settings > Cloud Messaging.
+4. Find Web configuration / Web Push certificates.
+5. Generate a key pair.
+6. Copy the public key only.
+
+Add this public key to .env.local:
+  NEXT_PUBLIC_FIREBASE_VAPID_KEY=PASTE_PUBLIC_WEB_PUSH_KEY
+
+Also add the same variable in:
+  Vercel > Existing RouteTrack Project > Settings > Environment Variables
+
+Apply it to Production and Preview.
+
+STEP 6 — CREATE SERVER CREDENTIALS
+1. Firebase Console > Project Settings > Service accounts.
+2. Click Generate new private key.
+3. Download the JSON file.
+4. Keep the JSON private and outside the GitHub project.
+
+From the JSON, obtain:
+- project_id
+- client_email
+- private_key
+
+Add these to Vercel Environment Variables:
+  FIREBASE_ADMIN_PROJECT_ID
+  FIREBASE_ADMIN_CLIENT_EMAIL
+  FIREBASE_ADMIN_PRIVATE_KEY
+
+Use the complete private key, including:
+  -----BEGIN PRIVATE KEY-----
+  -----END PRIVATE KEY-----
+
+The server code accepts either real line breaks or escaped \n characters.
+
+For local testing, add them to .env.local:
+  FIREBASE_ADMIN_PROJECT_ID=your-project-id
+  FIREBASE_ADMIN_CLIENT_EMAIL=service-account-email
+  FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+
+Never use NEXT_PUBLIC_ for any Firebase Admin credential.
+
+STEP 7 — FIREBASE CLOUD MESSAGING CHECK
+In Firebase / Google Cloud, confirm:
+- Firebase Cloud Messaging API is enabled
+- FCM Registration API is enabled
+
+New Firebase projects normally enable the registration API automatically.
+
+STEP 8 — BUILD
+Run:
+  npm run build
+
+The Next.js and TypeScript integration was validated before packaging.
+Your build after installing the real firebase-admin package is the final verification.
+
+STEP 9 — PUSH TO THE SAME REPOSITORY
+Run:
+  git add .
+  git commit -m "Add Messenger style phone notifications"
+  git push origin main
+
+STEP 10 — VERCEL
+1. Open the existing RouteTrack project.
+2. Wait for the new deployment to become Ready.
+3. Environment-variable changes apply only to a new deployment.
+4. Open the existing Vercel URL.
+5. Press Ctrl + Shift + R.
+
+STEP 11 — ENABLE ON ANDROID
+1. Open RouteTrack in Chrome.
+2. Sign in.
+3. Open the bell icon.
+4. Click Enable phone alerts.
+5. Choose Allow.
+6. Click Test.
+7. Put Chrome or RouteTrack in the background.
+
+Installing RouteTrack to the Home Screen is recommended.
+
+STEP 12 — ENABLE ON IPHONE/IPAD
+1. Open RouteTrack in Safari.
+2. Tap Share.
+3. Tap Add to Home Screen.
+4. Open RouteTrack using the new Home Screen icon.
+5. Sign in.
+6. Open the bell icon.
+7. Click Enable phone alerts.
+8. Choose Allow.
+9. Click Test.
+
+STEP 13 — TEST WITH TWO ACCOUNTS
+Browser/Phone A:
+- Sign in as Admin
+- Enable phone alerts
+
+Browser/Phone B:
+- Sign in as Student Assistant
+- Enable phone alerts
+- Send Admin a message
+
+Admin should receive:
+  RouteTrack
+  New message from [Student Assistant name]
+
+Tap the notification. It should open the Messages page.
+
+Also test:
+- Student Assistant routes or updates a document
+- Admin receives a document notification
+- Admin updates a Student Assistant's document
+- The owner receives the notification
+
+NO FIRESTORE RULES UPDATE
+Push-device records are written only by secure Firebase Admin server routes.
+The Firebase Admin SDK bypasses client Firestore Rules, so no rules change is needed.

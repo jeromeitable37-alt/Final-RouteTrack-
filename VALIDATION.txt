@@ -1,0 +1,1 @@
+Next.js 16.2.10 compilation, TypeScript validation, API route generation, and service-worker route generation completed successfully using compatible Firebase Admin interfaces. Install firebase-admin@14.1.0 locally and run npm run build for final package verification.

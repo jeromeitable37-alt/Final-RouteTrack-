@@ -31,6 +31,7 @@ import { RoutingForm } from "./RoutingForm";
 import { AcknowledgmentForm } from "./AcknowledgmentForm";
 import { FollowUpPanel } from "./FollowUpPanel";
 import { SupportingLinksPanel } from "./SupportingLinksPanel";
+import { sendPushNotification } from "@/lib/push-notifications";
 
 function routeSearchText(input: RoutingInput): string {
   return [
@@ -84,6 +85,23 @@ export function DocumentDetails({ user, document, onEdit, notify }: {
     !document.lastReceivedBy &&
     (!closed || isSingleRouteDocument);
 
+  function pushDocumentUpdate(title: string, body: string) {
+    const actorIsAdmin = String(user.role || "").toLowerCase() === "admin";
+    const destination = actorIsAdmin && document.ownerUid !== user.uid
+      ? { recipientUid: document.ownerUid }
+      : !actorIsAdmin
+        ? { recipientRole: "admin" as const }
+        : null;
+    if (!destination) return;
+    void sendPushNotification({
+      ...destination,
+      title,
+      body,
+      url: `/?document=${encodeURIComponent(document.id)}`,
+      category: "document",
+    }).catch(() => undefined);
+  }
+
   async function saveRoute(input: RoutingInput) {
     if (isSingleRouteDocument) {
       notify(
@@ -119,6 +137,10 @@ export function DocumentDetails({ user, document, onEdit, notify }: {
       });
       await addActivityLog(user, "ROUTED", `${document.type} ${document.requestNo} routed to ${input.toOffice}.`, document);
       setRoutingOpen(false);
+      pushDocumentUpdate(
+        `${document.type} ${document.requestNo} routed`,
+        `${user.displayName || user.email} routed the document to ${input.toOffice}.`,
+      );
       notify("Routing handoff recorded.");
     } catch (error) {
       notify(error instanceof Error ? error.message : "Unable to record the routing entry.", true);
@@ -152,6 +174,10 @@ export function DocumentDetails({ user, document, onEdit, notify }: {
         document,
       );
       setAcknowledgmentOpen(false);
+      pushDocumentUpdate(
+        `${document.type} ${document.requestNo} acknowledged`,
+        `${input.receivedBy} acknowledged receipt${isSingleRouteDocument ? " and the document was completed" : ""}.`,
+      );
       notify(
         isSingleRouteDocument
           ? `Receipt confirmed by ${input.receivedBy}. ${document.type} is now Completed.`
@@ -175,6 +201,7 @@ export function DocumentDetails({ user, document, onEdit, notify }: {
         completedAt: status === "Completed" ? now : "",
       });
       await addActivityLog(user, "STATUS", `${document.type} ${document.requestNo}: ${note}`, document);
+      pushDocumentUpdate(`${document.type} ${document.requestNo}: ${status}`, `${user.displayName || user.email}: ${note}`);
       notify(note);
     } catch (error) {
       notify(error instanceof Error ? error.message : "Unable to update the status.", true);
@@ -186,6 +213,7 @@ export function DocumentDetails({ user, document, onEdit, notify }: {
       if (archived) {
         await updateDocument(document.id, { archivedAt: "", archivedBy: "" });
         await addActivityLog(user, "RESTORED", `${document.type} ${document.requestNo} restored from archive.`, document);
+        pushDocumentUpdate(`${document.type} ${document.requestNo} restored`, `${user.displayName || user.email} restored this document from the archive.`);
         notify("Document restored from archive.");
       } else {
         if (!window.confirm(`Archive ${document.type} ${document.requestNo}? It can be restored later.`)) return;
@@ -194,6 +222,7 @@ export function DocumentDetails({ user, document, onEdit, notify }: {
           archivedBy: user.displayName || user.email,
         });
         await addActivityLog(user, "ARCHIVED", `${document.type} ${document.requestNo} archived.`, document);
+        pushDocumentUpdate(`${document.type} ${document.requestNo} archived`, `${user.displayName || user.email} archived this document.`);
         notify("Document archived. It was not permanently deleted.");
       }
     } catch (error) {
