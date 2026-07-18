@@ -1,0 +1,59 @@
+RouteTrack Smart Insights and AI Assistant
+
+Included enhancements:
+- Live Smart Insights panel on the dashboard
+- Floating RouteTrack Assistant
+- Exact, no-cost answers from visible RouteTrack data
+- Search by document number, approver, supplier, current holder, and status
+- Pending acknowledgment, stalled, missing, returned, and monthly summaries
+- Clickable document results
+- Optional real AI reasoning through the OpenAI Responses API
+- Firebase-authenticated server route
+- Read-only behavior: the bot cannot edit routing records
+- Dark-mode and mobile support
+
+Files to replace:
+- src/components/AppShell.tsx
+- src/app/globals.css
+
+Files to add:
+- src/components/SmartInsightsPanel.tsx
+- src/components/RouteTrackAssistant.tsx
+- src/app/api/ai-assistant/route.ts
+
+Basic setup (no paid AI required):
+1. Extract this ZIP.
+2. Copy the included src folder into the existing RouteTrack project.
+3. Choose Replace the files in the destination.
+4. Run: npm run build
+5. Push to the same GitHub repository.
+
+The Smart Assistant works immediately in Live RouteTrack Data mode without an API key.
+
+Optional real AI setup:
+1. Create an OpenAI API key in the OpenAI Platform.
+2. In Vercel, open the existing RouteTrack project.
+3. Go to Settings > Environment Variables.
+4. Add:
+   OPENAI_API_KEY = your secret API key
+   OPENAI_MODEL = gpt-5-mini
+5. Apply it to Production, Preview, and Development as needed.
+6. Redeploy the existing project.
+7. In RouteTrack Assistant, enable the AI reasoning switch.
+
+Security:
+- Never use NEXT_PUBLIC_OPENAI_API_KEY.
+- Never put the OpenAI API key in .env files committed to GitHub.
+- The API route verifies a signed-in Firebase account before calling OpenAI.
+- The AI receives only a compact summary of the documents visible to that user.
+- Amounts, remarks, account emails, and passwords are not included in AI context.
+- The AI endpoint is limited to 20 requests per signed-in account per hour per active server instance.
+
+Upload commands:
+git add .
+git commit -m "Add smart insights and RouteTrack AI assistant"
+git push origin main
+
+No Firestore Rules change is required.
+No Firebase collection is added.
+No npm install is required.

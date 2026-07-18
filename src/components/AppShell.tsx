@@ -62,6 +62,8 @@ import { InstallAppButton } from "./PwaSupport";
 import { MessagesPage } from "./MessagesPage";
 import { MonthlyDocumentsChart } from "./MonthlyDocumentsChart";
 import { ThemeToggle } from "./ThemeToggle";
+import { SmartInsightsPanel } from "./SmartInsightsPanel";
+import { RouteTrackAssistant } from "./RouteTrackAssistant";
 
 type View = "dashboard" | "documents" | "routes" | "alerts" | "archive" | "activity" | "messages" | "users" | "profile";
 
@@ -450,6 +452,8 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
 
           <MonthlyDocumentsChart documents={documents} />
 
+          <SmartInsightsPanel documents={documents} onOpenDocument={(id) => setSelectedId(id)} />
+
           <section className="document-finder panel">
             <div className="finder-heading"><div><p className="eyebrow">WHERE IS THE DOCUMENT?</p><h2>Search by document number, approver, receiver, supplier, or office.</h2></div>{isAdmin && <button className="secondary-button" onClick={() => void exportBackup()}><HardDriveDownload size={16} /> Download backup</button>}</div>
             <div className="search-box finder-search"><Search size={19} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Example: Ms. Trixie Araneta, Marc Marquez, PRF 1025, supplier…" /></div>
@@ -487,6 +491,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
       {formOpen && <Modal title={editing ? "Edit document" : "Quick routing log"} onClose={() => { setFormOpen(false); setEditing(null); }} wide><DocumentForm document={editing} existingDocuments={documents.map((item) => ({ id: item.id, type: item.type, requestNo: item.requestNo }))} ownerOptions={isAdmin ? activeOwnerOptions : undefined} ownerUid={ownerUid} onOwnerChange={setOwnerUid} onSubmit={saveDocument} onCancel={() => { setFormOpen(false); setEditing(null); }} /></Modal>}
       {selected && <Modal title={`${selected.type} ${selected.requestNo}`} onClose={() => setSelectedId(null)} wide><DocumentDetails user={user} document={{ ...selected, ownerName: userMap.get(selected.ownerUid)?.displayName || selected.ownerName, ownerEmail: userMap.get(selected.ownerUid)?.email || selected.ownerEmail }} onEdit={() => { setSelectedId(null); editDocument(selected); }} notify={notify} /></Modal>}
       {userFormOpen && isAdmin && <Modal title={editingUser ? "Edit user account" : "Create user account"} onClose={() => { setUserFormOpen(false); setEditingUser(null); }}><UserForm profile={editingUser} isSelf={editingUser?.uid === user.uid} onSubmit={saveUserAccount} onCancel={() => { setUserFormOpen(false); setEditingUser(null); }} /></Modal>}
+      <RouteTrackAssistant documents={documents} routeHistoryIndex={routeHistoryIndex} user={user} onOpenDocument={(id) => { setSelectedId(id); setView("documents"); }} />
       {toast && <div className={`toast ${toast.error ? "toast-error" : ""}`}>{toast.message}</div>}
     </div>
   );
