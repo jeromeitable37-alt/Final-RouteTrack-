@@ -5,6 +5,17 @@ export const runtime = "nodejs";
 
 const ALLOWED_CATEGORIES = new Set(["message", "document", "system", "test"]);
 
+type PushDeviceSnapshot = {
+  id: string;
+  data: () => Record<string, unknown>;
+  ref: {
+    set: (
+      data: Record<string, unknown>,
+      options: { merge: boolean },
+    ) => Promise<unknown>;
+  };
+};
+
 function clean(value: unknown, maximum: number): string {
   return String(value || "").replace(/[<>]/g, "").trim().slice(0, maximum);
 }
@@ -35,18 +46,36 @@ export async function POST(request: Request) {
       return Response.json({ error: "Select a notification recipient." }, { status: 400 });
     }
 
-    const allDevices = await adminDb().collection("pushDevices").where("enabled", "==", true).get();
-    const targets = allDevices.docs.filter((document: { data: () => Record<string, unknown>; id: string; ref: { set: (data: unknown, options?: unknown) => Promise<unknown> } }) => {
+    const allDevices = await adminDb()
+      .collection("pushDevices")
+      .where("enabled", "==", true)
+      .get();
+
+    // Use a small structural type for only the fields this route needs.
+    // This avoids conflicts between Firestore's overloaded DocumentReference.set()
+    // signature and manually declared callback types.
+    const deviceDocuments =
+      allDevices.docs as unknown as PushDeviceSnapshot[];
+
+    const targets = deviceDocuments.filter((document) => {
       const data = document.data();
-      if (recipientUid) return data.userUid === recipientUid;
-      return recipientRole === "admin" && data.userRole === "admin" && data.userUid !== sender.uid;
+
+      if (recipientUid) {
+        return data.userUid === recipientUid;
+      }
+
+      return (
+        recipientRole === "admin" &&
+        data.userRole === "admin" &&
+        data.userUid !== sender.uid
+      );
     });
 
     if (!targets.length) {
       return Response.json({ ok: true, sent: 0, message: "The recipient has not enabled phone alerts." });
     }
 
-    const fids = targets.map((document: { id: string }) => document.id).slice(0, 500);
+    const fids = targets.map((document) => document.id).slice(0, 500);
     const absoluteUrl = new URL(relativeUrl.startsWith("/") ? relativeUrl : "/", request.url).toString();
 
     const result = await adminMessaging().sendEachForMulticast({
