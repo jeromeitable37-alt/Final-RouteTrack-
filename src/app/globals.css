@@ -725,3 +725,74 @@ html[data-theme="dark"] .smart-insights-grid article,html[data-theme="dark"] .sm
 @media(max-width:800px){.modern-operations-grid,.reports-grid,.scanner-hero{grid-template-columns:1fr}.task-tile-grid{grid-template-columns:repeat(2,1fr)}.report-filter-grid{grid-template-columns:repeat(2,1fr)}.security-feature-grid{grid-template-columns:1fr}.online-status{display:none}.notification-popover{position:fixed;top:70px;right:12px}.followup-form,.support-link-form{grid-template-columns:1fr}.followup-wide,.support-link-wide{grid-column:auto}.scanner-manual-form{flex-direction:column}.login-activity-list article{grid-template-columns:1fr}.bulk-action-bar{flex-wrap:wrap}.bulk-action-bar .text-button{margin-left:0}.daily-briefing-card{padding:18px}.daily-briefing-copy h2{font-size:22px}}
 @media(max-width:540px){.report-kpi-grid{grid-template-columns:1fr}.report-filter-grid{grid-template-columns:1fr}.handover-actions{flex-direction:column}.handover-actions button{width:100%}.task-tile-grid{grid-template-columns:1fr 1fr}.modern-operations-grid{gap:12px}.daily-briefing-card{gap:12px}.daily-briefing-icon{width:40px;height:40px}.notification-popover{left:8px;right:8px;width:auto}}
 .backup-reminder{display:flex;align-items:center;gap:13px;border:1px solid rgba(234,88,12,.3);background:rgba(234,88,12,.08);border-radius:16px;padding:14px 16px}.backup-reminder>div{flex:1;display:flex;flex-direction:column}.backup-reminder>div span{font-size:12px;color:var(--muted)}.backup-reminder>svg{color:#ea580c}@media(max-width:640px){.backup-reminder{align-items:flex-start;flex-wrap:wrap}.backup-reminder button{width:100%}}
+
+/* =========================================================
+   RouteTrack scrollable sidebar fix
+   Keeps the brand and account controls visible while the
+   navigation menu scrolls independently.
+   ========================================================= */
+
+.sidebar {
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
+  box-sizing: border-box;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.sidebar .brand,
+.sidebar .admin-sidebar-badge,
+.sidebar .sidebar-footer {
+  flex-shrink: 0;
+}
+
+.sidebar nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 5px;
+  padding-bottom: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.32) transparent;
+  overscroll-behavior: contain;
+}
+
+.sidebar nav::-webkit-scrollbar {
+  width: 7px;
+}
+
+.sidebar nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+}
+
+.sidebar nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.sidebar-footer {
+  margin-top: 10px;
+  padding-top: 12px;
+  background: #103955;
+}
+
+@media (max-width: 760px) {
+  .sidebar {
+    top: 0;
+    bottom: 0;
+    height: 100dvh;
+    max-height: 100dvh;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  .sidebar nav {
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 16px;
+  }
+}
