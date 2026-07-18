@@ -1,39 +1,494 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { UserProfile } from "@/lib/types";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { sendPasswordResetEmail } from "firebase/auth";
+import {
+  Briefcase,
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  Copy,
+  KeyRound,
+  Mail,
+  Phone,
+  RotateCcw,
+  Save,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+} from "lucide-react";
+import { auth, firebaseConfigured } from "@/lib/firebase";
+import { SessionUser, UserProfile } from "@/lib/types";
 import { DEPARTMENTS } from "@/lib/workflow";
 import { ProfilePhotoPicker } from "./Avatar";
 import { SmartInput } from "./SmartInput";
 
-export function ProfileForm({ profile, onSubmit }: { profile: UserProfile; onSubmit: (changes: Partial<UserProfile>) => Promise<void> }) {
-  const [form, setForm] = useState({
-    displayName: profile.displayName,
+type EditableProfile = {
+  displayName: string;
+  department: string;
+  position: string;
+  phone: string;
+  photoDataUrl: string;
+};
+
+function editableProfile(profile: UserProfile): EditableProfile {
+  return {
+    displayName: profile.displayName || "",
     department: profile.department || "",
     position: profile.position || "",
     phone: profile.phone || "",
     photoDataUrl: profile.photoDataUrl || "",
-  });
+  };
+}
+
+function cleanProfile(form: EditableProfile): EditableProfile {
+  return {
+    displayName: form.displayName.trim(),
+    department: form.department.trim(),
+    position: form.position.trim(),
+    phone: form.phone.trim(),
+    photoDataUrl: form.photoDataUrl,
+  };
+}
+
+function formatProfileDate(value: string): string {
+  if (!value) return "Not available";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Not available";
+  return new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(parsed);
+}
+
+export function ProfileForm({
+  profile,
+  onSubmit,
+}: {
+  profile: SessionUser;
+  onSubmit: (changes: Partial<UserProfile>) => Promise<void>;
+}) {
+  const [form, setForm] = useState<EditableProfile>(() =>
+    editableProfile(profile),
+  );
+  const [baseline, setBaseline] = useState<EditableProfile>(() =>
+    editableProfile(profile),
+  );
   const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    message: string;
+    error?: boolean;
+  } | null>(null);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const next = editableProfile(profile);
+    setForm(next);
+    setBaseline(next);
+  }, [
+    profile.displayName,
+    profile.department,
+    profile.position,
+    profile.phone,
+    profile.photoDataUrl,
+  ]);
+
+  const normalizedForm = useMemo(() => cleanProfile(form), [form]);
+  const normalizedBaseline = useMemo(
+    () => cleanProfile(baseline),
+    [baseline],
+  );
+
+  const dirty =
+    JSON.stringify(normalizedForm) !== JSON.stringify(normalizedBaseline);
+
+  const completion = useMemo(() => {
+    const values = [
+      normalizedForm.displayName,
+      profile.email,
+      normalizedForm.department,
+      normalizedForm.position,
+      normalizedForm.phone,
+      normalizedForm.photoDataUrl,
+    ];
+    return Math.round(
+      (values.filter((value) => Boolean(String(value || "").trim())).length /
+        values.length) *
+        100,
+    );
+  }, [normalizedForm, profile.email]);
+
+  const isAdmin =
+    String(profile.role || "").trim().toLowerCase() === "admin";
+  const roleLabel = isAdmin ? "Administrator" : "Staff account";
+  const accountStatus = profile.active ? "Active" : "Disabled";
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (!normalizedForm.displayName) {
+      setFeedback({ message: "Enter your full name before saving.", error: true });
+      return;
+    }
+
     setSaving(true);
-    try { await onSubmit(form); } finally { setSaving(false); }
+    setFeedback(null);
+    try {
+      await onSubmit(normalizedForm);
+      setForm(normalizedForm);
+      setBaseline(normalizedForm);
+      setFeedback({ message: "Your profile information has been saved." });
+    } catch (caught) {
+      setFeedback({
+        message:
+          caught instanceof Error
+            ? caught.message
+            : "Unable to save your profile.",
+        error: true,
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function resetChanges() {
+    setForm(baseline);
+    setFeedback({ message: "Unsaved changes were removed." });
+  }
+
+  async function copyEmail() {
+    try {
+      await navigator.clipboard.writeText(profile.email);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setFeedback({
+        message: "Unable to copy the email address on this browser.",
+        error: true,
+      });
+    }
+  }
+
+  async function requestPasswordReset() {
+    if (profile.isDemo || !firebaseConfigured || !auth) {
+      setFeedback({
+        message: "Password recovery is unavailable in demo mode.",
+        error: true,
+      });
+      return;
+    }
+
+    setResettingPassword(true);
+    setFeedback(null);
+    try {
+      auth.useDeviceLanguage();
+      await sendPasswordResetEmail(auth, profile.email);
+      setFeedback({
+        message:
+          "A secure password reset link was sent. Check your inbox and spam folder.",
+      });
+    } catch (caught) {
+      const raw = caught instanceof Error ? caught.message : "";
+      const message = raw.toLowerCase();
+      setFeedback({
+        message: message.includes("too-many-requests")
+          ? "Too many reset attempts. Wait a few minutes and try again."
+          : message.includes("network")
+            ? "Unable to connect. Check your internet connection and try again."
+            : "Unable to send the reset email right now.",
+        error: true,
+      });
+    } finally {
+      setResettingPassword(false);
+    }
   }
 
   return (
-    <form className="profile-form" onSubmit={submit}>
-      <ProfilePhotoPicker name={form.displayName} value={form.photoDataUrl} onChange={(photoDataUrl) => setForm({ ...form, photoDataUrl })} />
-      <div className="form-grid">
-        <label>Full name<input value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} required /></label>
-        <label>Email address<input value={profile.email} disabled /></label>
-        <SmartInput label="Department / office" value={form.department} options={DEPARTMENTS} onChange={(department) => setForm({ ...form, department })} placeholder="Choose or type a department" />
-        <label>Position / role title<input value={form.position} onChange={(event) => setForm({ ...form, position: event.target.value })} placeholder="Example: Student Assistant" /></label>
-        <label className="span-2">Contact number<input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="Optional" /></label>
-      </div>
-      <div className="profile-account-note"><strong>System access:</strong> {String(profile.role).trim().toLowerCase() === "admin" ? "Administrator" : "Staff"}. Passwords are handled by Firebase Authentication and are never saved in the document database.</div>
-      <div className="form-actions"><button className="primary-button" disabled={saving}>{saving ? "Saving…" : "Save profile"}</button></div>
-    </form>
+    <div className="professional-profile-page">
+      <section className="professional-profile-hero">
+        <div className="profile-hero-glow profile-hero-glow-one" />
+        <div className="profile-hero-glow profile-hero-glow-two" />
+
+        <div className="professional-profile-identity">
+          <ProfilePhotoPicker
+            name={form.displayName}
+            value={form.photoDataUrl}
+            onChange={(photoDataUrl) =>
+              setForm((current) => ({ ...current, photoDataUrl }))
+            }
+          />
+
+          <div className="professional-profile-title">
+            <p className="profile-hero-kicker">
+              <Sparkles size={14} /> RouteTrack account
+            </p>
+            <h2>{form.displayName || "Complete your profile"}</h2>
+            <p>
+              Keep your identity and Purchasing Department details accurate so
+              every route, follow-up, handover, and activity record is properly
+              attributed to you.
+            </p>
+
+            <div className="profile-badge-row">
+              <span className={`profile-role-badge ${isAdmin ? "is-admin" : ""}`}>
+                <ShieldCheck size={15} /> {roleLabel}
+              </span>
+              <span
+                className={`profile-status-badge ${profile.active ? "is-active" : "is-disabled"}`}
+              >
+                <CheckCircle2 size={15} /> {accountStatus}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="profile-completion-card" aria-label={`${completion}% profile complete`}>
+          <div
+            className="profile-completion-ring"
+            style={{ "--profile-completion": `${completion * 3.6}deg` } as React.CSSProperties}
+          >
+            <div>
+              <strong>{completion}%</strong>
+              <span>complete</span>
+            </div>
+          </div>
+          <div>
+            <strong>Profile readiness</strong>
+            <span>
+              {completion === 100
+                ? "Your account information is complete."
+                : "Add the missing details to improve accountability."}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section className="profile-summary-grid" aria-label="Account summary">
+        <article className="profile-summary-card">
+          <div className="profile-summary-icon"><Briefcase size={19} /></div>
+          <span>Position</span>
+          <strong>{form.position || "Not specified"}</strong>
+        </article>
+        <article className="profile-summary-card">
+          <div className="profile-summary-icon"><Building2 size={19} /></div>
+          <span>Department</span>
+          <strong>{form.department || "Not assigned"}</strong>
+        </article>
+        <article className="profile-summary-card">
+          <div className="profile-summary-icon"><CalendarDays size={19} /></div>
+          <span>Member since</span>
+          <strong>{formatProfileDate(profile.createdAt)}</strong>
+        </article>
+        <article className="profile-summary-card">
+          <div className="profile-summary-icon"><CheckCircle2 size={19} /></div>
+          <span>Last profile update</span>
+          <strong>{formatProfileDate(profile.updatedAt)}</strong>
+        </article>
+      </section>
+
+      <form className="professional-profile-form" onSubmit={submit}>
+        <section className="professional-profile-section">
+          <div className="profile-section-heading">
+            <div className="profile-section-icon"><UserRound size={20} /></div>
+            <div>
+              <p className="eyebrow">PERSONAL INFORMATION</p>
+              <h3>Your identity</h3>
+              <span>
+                This name appears in routing entries, follow-ups, messages, and
+                audit logs.
+              </span>
+            </div>
+          </div>
+
+          <div className="professional-profile-fields">
+            <label>
+              <span>Full name</span>
+              <div className="profile-input-wrap">
+                <UserRound size={17} />
+                <input
+                  value={form.displayName}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      displayName: event.target.value,
+                    }))
+                  }
+                  placeholder="Enter your complete name"
+                  autoComplete="name"
+                  required
+                />
+              </div>
+              <small>Use the same name shown in official Purchasing records.</small>
+            </label>
+
+            <label>
+              <span>Contact number</span>
+              <div className="profile-input-wrap">
+                <Phone size={17} />
+                <input
+                  value={form.phone}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      phone: event.target.value,
+                    }))
+                  }
+                  placeholder="Example: 09XX XXX XXXX"
+                  autoComplete="tel"
+                  inputMode="tel"
+                />
+              </div>
+              <small>Optional. Use a number where the department can reach you.</small>
+            </label>
+          </div>
+        </section>
+
+        <section className="professional-profile-section">
+          <div className="profile-section-heading">
+            <div className="profile-section-icon"><Building2 size={20} /></div>
+            <div>
+              <p className="eyebrow">WORK INFORMATION</p>
+              <h3>Department assignment</h3>
+              <span>
+                These details help other users understand your role inside the
+                Purchasing Department.
+              </span>
+            </div>
+          </div>
+
+          <div className="professional-profile-fields">
+            <SmartInput
+              label="Department / office"
+              value={form.department}
+              options={DEPARTMENTS}
+              onChange={(department) =>
+                setForm((current) => ({ ...current, department }))
+              }
+              placeholder="Choose or type a department"
+            />
+
+            <label>
+              <span>Position / role title</span>
+              <div className="profile-input-wrap">
+                <Briefcase size={17} />
+                <input
+                  value={form.position}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      position: event.target.value,
+                    }))
+                  }
+                  placeholder="Example: Student Assistant"
+                  autoComplete="organization-title"
+                />
+              </div>
+              <small>Describe your current responsibility in the department.</small>
+            </label>
+          </div>
+        </section>
+
+        <section className="professional-profile-section profile-security-section">
+          <div className="profile-section-heading">
+            <div className="profile-section-icon"><ShieldCheck size={20} /></div>
+            <div>
+              <p className="eyebrow">ACCOUNT &amp; SECURITY</p>
+              <h3>Sign-in information</h3>
+              <span>
+                Your email and access level are protected by Firebase
+                Authentication and cannot be changed from this form.
+              </span>
+            </div>
+          </div>
+
+          <div className="profile-security-grid">
+            <div className="profile-readonly-field">
+              <div className="profile-readonly-icon"><Mail size={18} /></div>
+              <div>
+                <span>Email address</span>
+                <strong>{profile.email}</strong>
+              </div>
+              <button
+                type="button"
+                className="profile-copy-button"
+                onClick={copyEmail}
+                aria-label="Copy email address"
+              >
+                {copied ? <CheckCircle2 size={17} /> : <Copy size={17} />}
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+
+            <div className="profile-readonly-field">
+              <div className="profile-readonly-icon"><ShieldCheck size={18} /></div>
+              <div>
+                <span>System access</span>
+                <strong>{roleLabel} · {accountStatus}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="profile-password-card">
+            <div className="profile-password-icon"><KeyRound size={22} /></div>
+            <div>
+              <strong>Password security</strong>
+              <span>
+                RouteTrack never stores readable passwords. Send a secure reset
+                link to your registered email when you need to change it.
+              </span>
+            </div>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={requestPasswordReset}
+              disabled={resettingPassword || profile.isDemo}
+            >
+              <KeyRound size={16} />
+              {resettingPassword ? "Sending…" : "Send reset email"}
+            </button>
+          </div>
+        </section>
+
+        {feedback && (
+          <div
+            className={`profile-feedback ${feedback.error ? "is-error" : "is-success"}`}
+            role={feedback.error ? "alert" : "status"}
+          >
+            {feedback.error ? <ShieldCheck size={17} /> : <CheckCircle2 size={17} />}
+            <span>{feedback.message}</span>
+          </div>
+        )}
+
+        <div className="professional-profile-actions">
+          <div>
+            <strong>{dirty ? "Unsaved changes" : "Profile is up to date"}</strong>
+            <span>
+              {dirty
+                ? "Review your information, then save your changes."
+                : "Any future changes will be recorded in the activity log."}
+            </span>
+          </div>
+
+          <div className="profile-action-buttons">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={resetChanges}
+              disabled={!dirty || saving}
+            >
+              <RotateCcw size={16} /> Reset changes
+            </button>
+            <button
+              type="submit"
+              className="primary-button profile-save-button"
+              disabled={!dirty || saving}
+            >
+              <Save size={16} /> {saving ? "Saving profile…" : "Save profile"}
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
   );
 }

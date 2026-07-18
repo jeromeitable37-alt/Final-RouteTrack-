@@ -1,0 +1,53 @@
+ROUTETRACK PROFESSIONAL PROFILE PAGE
+
+This patch updates the existing RouteTrack project only.
+Do not create a new GitHub repository or Vercel project.
+
+FEATURES
+- Modern professional profile hero
+- Larger profile picture controls
+- Administrator/Staff and Active/Disabled badges
+- Profile-completeness indicator
+- Position, department, member-since, and last-updated summary cards
+- Cleaner Personal Information and Work Information sections
+- Account and Security section
+- Copy email button
+- Send password reset email from the profile page
+- Unsaved-change detection
+- Reset changes button
+- Save button enabled only when something changed
+- Success and error messages
+- Responsive desktop and mobile layout
+- Full dark-mode styling
+- Existing scrollable sidebar fix preserved
+
+FILES REPLACED
+- src/components/ProfileForm.tsx
+- src/components/AppShell.tsx
+- src/app/globals.css
+
+INSTALLATION
+1. Back up the current RouteTrack project folder.
+2. Extract RouteTrack_Professional_Profile_Page_Patch.zip.
+3. Copy the included src folder into the root of the existing project.
+4. Choose "Replace the files in the destination".
+5. Keep the existing .git folder and .env.local file.
+6. Run:
+   npm run build
+7. Push to the same repository:
+   git add .
+   git commit -m "Redesign professional profile page"
+   git push origin main
+8. Wait for the existing Vercel deployment to become Ready.
+9. Refresh the site with Ctrl + Shift + R.
+
+No npm install is required.
+No Firestore Rules update is required.
+No Firebase collection changes are required.
+
+BUILD VERIFICATION
+The updated cumulative project was successfully production-built with:
+- Next.js 16.2.10
+- TypeScript validation
+- Static page generation
+- Existing AI, messages, charts, operations, dark mode, and sidebar features
