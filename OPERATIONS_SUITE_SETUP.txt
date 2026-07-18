@@ -1,0 +1,80 @@
+ROUTETRACK MODERN AI OPERATIONS SUITE
+Update the existing GitHub/Vercel deployment. Do not create a new repository or Vercel project.
+
+FEATURES INCLUDED
+- Smart Daily Briefing and My Tasks Today
+- Real-time notification center and optional browser alerts
+- Universal Ctrl+K command search
+- Live workload and recent activity feed
+- SLA/document aging and overdue labels
+- Follow-up history with method, result, and next follow-up
+- Supporting-file links for Google Drive, OneDrive, or approved cloud storage
+- Mobile QR camera scanner with manual fallback
+- Enhanced reports, date/type/status/holder filters, and CSV export
+- XLSX/XLS/CSV spreadsheet importer with duplicate validation
+- Shift handover report with save, copy, and download
+- Bulk select, export selected, and schedule follow-up tomorrow
+- Login activity and 30-minute inactivity logout
+- Firestore multi-tab offline cache and connection status
+- Weekly backup reminder for administrators
+- Existing AI assistant, route suggestions, messages, dark mode, monthly chart,
+  forgot password, QR codes, activity logs, and CRF/PO acknowledgment preserved
+
+IMPORTANT LIMITATIONS
+- Supporting files are saved as secure cloud links. Existing routing proof photos still work.
+  Large direct uploads are not stored in Firestore to avoid document-size and billing problems.
+- Browser notifications are shown when RouteTrack is open. True background push notifications
+  require a separate Firebase Cloud Messaging setup.
+- Weekly backup is a reminder and one-click download. Fully automatic cloud backups require
+  a scheduled backend job and a backup storage destination.
+
+INSTALLATION
+1. Back up your current RouteTrack project folder.
+2. Extract RouteTrack_Modern_AI_Operations_Suite_Patch.zip.
+3. Copy everything inside the extracted patch into the ROOT of your existing RouteTrack project.
+4. Choose "Replace the files in the destination".
+5. Keep your existing hidden .git folder and .env.local file.
+6. Open the existing project in VS Code.
+7. Run:
+   npm config set registry https://registry.npmjs.org/
+   npm install
+   npm run build
+
+FIRESTORE RULES
+8. Open the updated firestore.rules.
+9. Firebase Console > Firestore Database > Rules.
+10. Replace the current rules with the complete updated file.
+11. Click Publish.
+
+DEPLOY THE SAME PROJECT
+12. Run:
+    git add .
+    git commit -m "Add modern AI operations suite"
+    git push origin main
+13. Vercel will redeploy the same project automatically.
+14. Wait for the deployment status to become Ready.
+15. Open the existing Vercel URL and press Ctrl + Shift + R.
+
+TEST CHECKLIST
+- Dashboard: Smart Daily Briefing, My Tasks Today, workload, activity
+- Bell icon: notifications
+- Ctrl+K: universal search
+- QR Scanner: camera or manual document number
+- Reports & Import: filters, export, spreadsheet preview/import
+- Document details: Record Follow-up and Supporting Files
+- Shift Handover: generate, save, copy, download
+- Security: login history and offline information
+- Documents: select multiple records and use bulk actions
+- Turn internet off after opening records: cached data should remain available on supported browsers
+
+BUILD VERIFICATION
+The complete project was tested with:
+- npm ci using the public npm registry
+- Next.js 16.2.10 production build
+- TypeScript validation
+- Static route generation
+
+Successful routes:
+- /
+- /manifest.webmanifest
+- /api/ai-assistant

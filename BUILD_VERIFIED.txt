@@ -1,0 +1,2 @@
+Production build successful with Next.js 16.2.10 and TypeScript.
+npm ci used public registry package-lock URLs.

@@ -115,6 +115,45 @@ service cloud.firestore {
 
         allow delete: if false;
       }
+
+
+      match /followUps/{followUpId} {
+        allow read: if isActive()
+          && (
+            isAdmin()
+            || get(/databases/$(database)/documents/documents/$(documentId)).data.ownerUid == request.auth.uid
+          );
+
+        allow create: if isActive()
+          && request.resource.data.documentId == documentId
+          && request.resource.data.createdByUid == request.auth.uid
+          && (
+            isAdmin()
+            || get(/databases/$(database)/documents/documents/$(documentId)).data.ownerUid == request.auth.uid
+          );
+
+        allow update, delete: if false;
+      }
+
+      match /supportingLinks/{linkId} {
+        allow read: if isActive()
+          && (
+            isAdmin()
+            || get(/databases/$(database)/documents/documents/$(documentId)).data.ownerUid == request.auth.uid
+          );
+
+        allow create: if isActive()
+          && request.resource.data.documentId == documentId
+          && request.resource.data.createdByUid == request.auth.uid
+          && request.resource.data.url is string
+          && request.resource.data.url.size() > 0
+          && (
+            isAdmin()
+            || get(/databases/$(database)/documents/documents/$(documentId)).data.ownerUid == request.auth.uid
+          );
+
+        allow update, delete: if false;
+      }
     }
 
     match /conversations/{conversationId} {
@@ -165,6 +204,26 @@ service cloud.firestore {
 
         allow delete: if false;
       }
+    }
+
+    match /handovers/{handoverId} {
+      allow create: if isActive()
+        && request.resource.data.ownerUid == request.auth.uid;
+
+      allow read: if isAdmin()
+        || (isActive() && resource.data.ownerUid == request.auth.uid);
+
+      allow update, delete: if false;
+    }
+
+    match /loginActivity/{loginId} {
+      allow create: if isActive()
+        && request.resource.data.userUid == request.auth.uid;
+
+      allow read: if isAdmin()
+        || (isActive() && resource.data.userUid == request.auth.uid);
+
+      allow update, delete: if false;
     }
 
     match /activityLogs/{activityId} {

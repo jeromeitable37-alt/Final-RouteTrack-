@@ -29,6 +29,8 @@ import { formatCurrency, formatDate, formatDateTime, statusClass } from "@/lib/u
 import { Modal } from "./Modal";
 import { RoutingForm } from "./RoutingForm";
 import { AcknowledgmentForm } from "./AcknowledgmentForm";
+import { FollowUpPanel } from "./FollowUpPanel";
+import { SupportingLinksPanel } from "./SupportingLinksPanel";
 
 function routeSearchText(input: RoutingInput): string {
   return [
@@ -242,6 +244,9 @@ export function DocumentDetails({ user, document, onEdit, notify }: {
         )}
         {(document.itemsDescription || document.subjectPurpose) && <div className="remarks-box"><span>Description / items</span><p>{document.itemsDescription || document.subjectPurpose}</p></div>}
         {document.remarks && <div className="remarks-box"><span>Remarks</span><p>{document.remarks}</p></div>}
+
+        <FollowUpPanel user={user} document={document} notify={notify} />
+        <SupportingLinksPanel user={user} document={document} notify={notify} />
 
         {qrDataUrl && <div className="document-qr-block">
           <div><p className="eyebrow">SCAN TO TRACE</p><strong>Open this document record on a phone</strong><span>Sign in first when required.</span></div>

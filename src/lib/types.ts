@@ -93,6 +93,10 @@ export interface DocumentRecord {
   completedAt?: string;
   archivedAt?: string;
   archivedBy?: string;
+  lastFollowUpAt?: string;
+  nextFollowUpAt?: string;
+  followUpCount?: number;
+  slaDays?: number;
 }
 
 export type DocumentInput = Omit<
@@ -179,4 +183,51 @@ export interface DirectMessageRecord {
 
 export interface SessionUser extends UserProfile {
   isDemo?: boolean;
+}
+
+
+export const FOLLOW_UP_METHODS = ["Personal", "Call", "Message", "Email"] as const;
+export type FollowUpMethod = (typeof FOLLOW_UP_METHODS)[number];
+
+export interface FollowUpRecord {
+  id: string;
+  documentId: string;
+  contactedPerson: string;
+  method: FollowUpMethod;
+  result: string;
+  nextFollowUpAt: string;
+  notes: string;
+  createdAt: string;
+  createdByUid: string;
+  createdByName: string;
+}
+
+export interface SupportingLinkRecord {
+  id: string;
+  documentId: string;
+  title: string;
+  url: string;
+  notes: string;
+  createdAt: string;
+  createdByUid: string;
+  createdByName: string;
+}
+
+export interface HandoverRecord {
+  id: string;
+  ownerUid: string;
+  ownerName: string;
+  shiftDate: string;
+  summary: string;
+  documentIds: string[];
+  createdAt: string;
+}
+
+export interface LoginActivityRecord {
+  id: string;
+  userUid: string;
+  userName: string;
+  userEmail: string;
+  userAgent: string;
+  createdAt: string;
 }

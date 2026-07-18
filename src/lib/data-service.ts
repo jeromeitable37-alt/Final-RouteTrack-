@@ -133,6 +133,10 @@ function normalizeDocument(
     completedAt: raw.completedAt,
     archivedAt: raw.archivedAt,
     archivedBy: raw.archivedBy,
+    lastFollowUpAt: raw.lastFollowUpAt,
+    nextFollowUpAt: raw.nextFollowUpAt,
+    followUpCount: Number(raw.followUpCount || 0),
+    slaDays: Number(raw.slaDays || 3),
   };
 }
 
@@ -540,13 +544,9 @@ export async function updateDocument(
     ownerEmail: _ownerEmail,
     ...safeChanges
   } = changes;
-  // Firestore rejects undefined values. Preserve valid empty strings,
-  // false, zero, and null while removing only undefined fields.
   const payload = Object.fromEntries(
-    Object.entries({
-      ...safeChanges,
-      updatedAt: new Date().toISOString(),
-    }).filter(([, value]) => value !== undefined),
+    Object.entries({ ...safeChanges, updatedAt: new Date().toISOString() })
+      .filter(([, value]) => value !== undefined),
   ) as Partial<DocumentRecord>;
   if (firebaseConfigured && db) {
     await updateDoc(doc(db, "documents", id), payload);

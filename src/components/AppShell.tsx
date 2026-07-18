@@ -11,6 +11,11 @@ import {
   Download,
   FilePlus2,
   HardDriveDownload,
+  ClipboardCheck,
+  QrCode,
+  ScanLine,
+  Shield,
+  Sparkles,
   History,
   LogOut,
   Menu,
@@ -64,8 +69,15 @@ import { MonthlyDocumentsChart } from "./MonthlyDocumentsChart";
 import { ThemeToggle } from "./ThemeToggle";
 import { SmartInsightsPanel } from "./SmartInsightsPanel";
 import { RouteTrackAssistant } from "./RouteTrackAssistant";
+import { ModernOperationsPanel } from "./ModernOperationsPanel";
+import { NotificationCenter } from "./NotificationCenter";
+import { CommandPalette, CommandAction } from "./CommandPalette";
+import { QrScannerPage } from "./QrScannerPage";
+import { ReportsPage } from "./ReportsPage";
+import { ShiftHandoverPage } from "./ShiftHandoverPage";
+import { IdleSessionGuard, OnlineStatus, SecurityPage } from "./SecurityAndOffline";
 
-type View = "dashboard" | "documents" | "routes" | "alerts" | "archive" | "activity" | "messages" | "users" | "profile";
+type View = "dashboard" | "documents" | "routes" | "alerts" | "archive" | "activity" | "messages" | "reports" | "scanner" | "handover" | "security" | "users" | "profile";
 
 function isAdminRole(role: unknown): boolean {
   return String(role || "").trim().toLowerCase() === "admin";
@@ -96,6 +108,8 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
   const [userSearch, setUserSearch] = useState("");
   const [toast, setToast] = useState<{ message: string; error?: boolean } | null>(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<Set<string>>(new Set());
+  const [lastBackupAt, setLastBackupAt] = useState("");
 
   useEffect(() => {
     let unsubscribe: () => void = () => {};
@@ -158,6 +172,12 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
     const timer = setTimeout(() => setToast(null), 3200);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setLastBackupAt(localStorage.getItem("routetrack-last-backup-at") || "");
+    }
+  }, []);
 
   useEffect(() => {
     if (view === "users" && !isAdmin) setView("dashboard");
@@ -377,6 +397,64 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
     })));
   }
 
+  function toggleDocumentSelection(id: string) {
+    setSelectedDocumentIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllFilteredDocuments() {
+    setSelectedDocumentIds((current) => {
+      const allSelected = filteredDocuments.length > 0 && filteredDocuments.every((item) => current.has(item.id));
+      return allSelected ? new Set() : new Set(filteredDocuments.map((item) => item.id));
+    });
+  }
+
+  function exportSelectedDocuments() {
+    const selectedItems = filteredDocuments.filter((item) => selectedDocumentIds.has(item.id));
+    if (!selectedItems.length) {
+      notify("Select at least one document first.", true);
+      return;
+    }
+    csvDownload("routetrack-selected-documents.csv", selectedItems.map((item) => ({
+      Type: item.type,
+      Number: item.requestNo,
+      Status: item.status,
+      "Current holder": item.currentHolder,
+      Supplier: item.supplier || "",
+      Requester: item.purchasingEmployee || item.requestor,
+      "Date requested": item.dateRequested,
+      "Last routed": item.lastRoutedAt || "",
+    })));
+  }
+
+  async function markSelectedForFollowUp() {
+    const selectedItems = filteredDocuments.filter((item) => selectedDocumentIds.has(item.id));
+    if (!selectedItems.length) {
+      notify("Select at least one document first.", true);
+      return;
+    }
+    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 16);
+    try {
+      await Promise.all(selectedItems.map((item) => updateDocument(item.id, { nextFollowUpAt: tomorrow })));
+      await addActivityLog(user, "BULK_FOLLOW_UP", `${selectedItems.length} document(s) scheduled for follow-up tomorrow.`);
+      notify(`${selectedItems.length} document(s) marked for follow-up tomorrow.`);
+      setSelectedDocumentIds(new Set());
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Unable to update selected documents.", true);
+    }
+  }
+
+  const commandActions: CommandAction[] = [
+    { id: "dashboard", label: "Open dashboard", description: "View tasks, insights, charts, and workload", icon: "dashboard", run: () => openView("dashboard") },
+    { id: "documents", label: "Open document register", description: "Search and manage all visible document records", icon: "documents", run: () => openView("documents") },
+    { id: "reports", label: "Open reports", description: "Analyze trends and import spreadsheet records", icon: "reports", run: () => openView("reports") },
+    { id: "scanner", label: "Scan document QR", description: "Use the phone camera to open a RouteTrack record", icon: "scanner", run: () => openView("scanner") },
+    { id: "messages", label: "Open messages", description: "Communicate with Purchasing administrators and assistants", icon: "messages", run: () => openView("messages") },
+  ];
+
   async function exportBackup() {
     try {
       const routeEntries = await Promise.all(documents.map(async (item) => ({
@@ -392,6 +470,9 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
         routes: routeEntries,
         activities,
       });
+      const backupTime = new Date().toISOString();
+      localStorage.setItem("routetrack-last-backup-at", backupTime);
+      setLastBackupAt(backupTime);
       notify("Backup downloaded.");
     } catch {
       notify("Unable to prepare the backup.", true);
@@ -405,8 +486,12 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
           : view === "archive" ? "Archived documents"
             : view === "activity" ? "Activity log"
               : view === "messages" ? "Messages"
-                : view === "users" ? "User management"
-                  : "My profile";
+                : view === "reports" ? "Reports and import"
+                  : view === "scanner" ? "QR scanner"
+                    : view === "handover" ? "Shift handover"
+                      : view === "security" ? "Security and sessions"
+                        : view === "users" ? "User management"
+                          : "My profile";
 
   return (
     <div className="app-layout">
@@ -421,6 +506,10 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
           <button className={view === "archive" ? "active" : ""} onClick={() => openView("archive")}><Archive size={19} /> Archive <span>{archivedDocuments.length}</span></button>
           <button className={view === "activity" ? "active" : ""} onClick={() => openView("activity")}><History size={19} /> Activity <span>{activities.length}</span></button>
           <button className={view === "messages" ? "active" : ""} onClick={() => openView("messages")}><MessageCircle size={19} /> Messages {unreadMessages > 0 && <span className="nav-alert">{unreadMessages}</span>}</button>
+          <button className={view === "reports" ? "active" : ""} onClick={() => openView("reports")}><Sparkles size={19} /> Reports & Import</button>
+          <button className={view === "scanner" ? "active" : ""} onClick={() => openView("scanner")}><ScanLine size={19} /> QR Scanner</button>
+          <button className={view === "handover" ? "active" : ""} onClick={() => openView("handover")}><ClipboardCheck size={19} /> Shift Handover</button>
+          <button className={view === "security" ? "active" : ""} onClick={() => openView("security")}><Shield size={19} /> Security</button>
           {isAdmin && <button className={view === "users" ? "active" : ""} onClick={() => openView("users")}><Users size={19} /> Users <span>{users.length}</span></button>}
           <button className={view === "profile" ? "active" : ""} onClick={() => openView("profile")}><UserRound size={19} /> My profile</button>
         </nav>
@@ -432,7 +521,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
       {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)} />}
 
       <main className="main-content">
-        <header className="topbar"><button className="menu-button" onClick={() => setMenuOpen(true)}><Menu size={20} /></button><div><p className="eyebrow">ROUTETRACK</p><h1>{viewTitle}</h1></div><div className="topbar-actions"><ThemeToggle /><InstallAppButton />{view !== "users" && view !== "profile" && view !== "messages" && <button className="primary-button top-add" onClick={newDocument}><Plus size={17} /> Quick log</button>}</div></header>
+        <header className="topbar"><button className="menu-button" onClick={() => setMenuOpen(true)}><Menu size={20} /></button><div className="topbar-title"><p className="eyebrow">ROUTETRACK</p><h1>{viewTitle}</h1></div><CommandPalette documents={visibleDocuments} actions={commandActions} onOpenDocument={(id) => { setSelectedId(id); setView("documents"); }} /><div className="topbar-actions"><OnlineStatus /><NotificationCenter documents={visibleDocuments} unreadMessages={unreadMessages} onOpenDocument={(id) => { setSelectedId(id); setView("documents"); }} onOpenMessages={() => setView("messages")} /><ThemeToggle /><InstallAppButton />{view !== "users" && view !== "profile" && view !== "messages" && view !== "security" && <button className="primary-button top-add" onClick={newDocument}><Plus size={17} /> Quick log</button>}</div></header>
         {user.isDemo && <div className="demo-banner"><AlertTriangle size={17} /> Demo mode: records are stored only in this browser.</div>}
 
         {view === "dashboard" && <div className="page-section">
@@ -449,6 +538,10 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
             <MiniMetric label="Pending follow-up" value={alerts.length} />
             <MiniMetric label="Staying over 3 days" value={stalled.length} />
           </section>
+
+          <ModernOperationsPanel documents={visibleDocuments} activities={activities} user={user} unreadMessages={unreadMessages} onOpenDocument={(id) => { setSelectedId(id); setView("documents"); }} onOpenMessages={() => setView("messages")} onOpenAlerts={() => setView("alerts")} />
+
+          {isAdmin && (!lastBackupAt || Date.now() - new Date(lastBackupAt).getTime() > 7 * 86_400_000) && <section className="backup-reminder"><HardDriveDownload size={20} /><div><strong>Weekly backup is due</strong><span>Download the current documents, routes, users, and activity logs.</span></div><button className="secondary-button" onClick={() => void exportBackup()}>Download backup</button></section>}
 
           <MonthlyDocumentsChart documents={documents} />
 
@@ -468,7 +561,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
           </section>
         </div>}
 
-        {view === "documents" && <div className="page-section"><section className="panel"><Filters search={search} setSearch={setSearch} typeFilter={typeFilter} setTypeFilter={setTypeFilter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onExport={exportDocuments} /><DocumentTable documents={filteredDocuments} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={isAdmin} userMap={userMap} requestCounts={requestCounts} /></section></div>}
+        {view === "documents" && <div className="page-section"><section className="panel"><Filters search={search} setSearch={setSearch} typeFilter={typeFilter} setTypeFilter={setTypeFilter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onExport={exportDocuments} />{selectedDocumentIds.size > 0 && <div className="bulk-action-bar"><strong>{selectedDocumentIds.size} selected</strong><button className="secondary-button compact-button" onClick={exportSelectedDocuments}><Download size={15} /> Export selected</button><button className="secondary-button compact-button" onClick={() => void markSelectedForFollowUp()}><Clock3 size={15} /> Follow up tomorrow</button><button className="text-button" onClick={() => setSelectedDocumentIds(new Set())}>Clear</button></div>}<DocumentTable documents={filteredDocuments} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={isAdmin} userMap={userMap} requestCounts={requestCounts} selectable selectedIds={selectedDocumentIds} onToggleSelect={toggleDocumentSelection} onToggleAll={toggleAllFilteredDocuments} /></section></div>}
 
         {view === "routes" && <div className="page-section"><section className="routing-explainer"><div><p className="eyebrow">CHAIN OF CUSTODY</p><h2>Each handoff keeps the exact date, time, person, and office.</h2><p>Open any record to add the next route or check the complete history.</p></div><Clock3 size={42} /></section><section className="panel"><Filters search={search} setSearch={setSearch} typeFilter={typeFilter} setTypeFilter={setTypeFilter} onExport={exportRoutes} /><RoutingTable documents={filteredRoutes} loading={loading} onOpen={(item) => setSelectedId(item.id)} showOwner={isAdmin} userMap={userMap} /></section></div>}
 
@@ -479,6 +572,14 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
         {view === "activity" && <div className="page-section"><section className="panel"><div className="panel-heading"><div><p className="eyebrow">AUDIT TRAIL</p><h2>{isAdmin ? "System activity" : "My activity"}</h2></div></div><ActivityList activities={activities} full /></section></div>}
 
         {view === "messages" && <div className="page-section messages-section"><MessagesPage user={user} users={users} notify={notify} /></div>}
+
+        {view === "reports" && <ReportsPage documents={visibleDocuments} user={user} notify={notify} onOpenDocument={(id) => { setSelectedId(id); setView("documents"); }} />}
+
+        {view === "scanner" && <QrScannerPage documents={visibleDocuments} onOpenDocument={(id) => { setSelectedId(id); setView("documents"); }} />}
+
+        {view === "handover" && <ShiftHandoverPage user={user} documents={visibleDocuments} notify={notify} />}
+
+        {view === "security" && <SecurityPage user={user} onLogout={() => void logout()} />}
 
         {view === "users" && isAdmin && <div className="page-section"><section className="metric-grid user-metric-grid"><Metric label="Total accounts" value={users.length} note="Registered profiles" /><Metric label="Active" value={users.filter((item) => item.active).length} note="Can use the system" positive /><Metric label="Administrators" value={users.filter((item) => isAdminRole(item.role)).length} note="Full access" /><Metric label="Disabled" value={users.filter((item) => !item.active).length} note="Access blocked" alert={users.some((item) => !item.active)} /></section><section className="panel"><div className="user-toolbar"><div className="search-box"><Search size={18} /><input placeholder="Search name, department, position…" value={userSearch} onChange={(event) => setUserSearch(event.target.value)} /></div><button className="primary-button" onClick={newUser}><UserPlus size={17} /> Create account</button></div><UserTable users={filteredUsers} currentUid={user.uid} documentCounts={documents.reduce<Record<string, number>>((acc, item) => { acc[item.ownerUid] = (acc[item.ownerUid] || 0) + 1; return acc; }, {})} onEdit={editUser} /></section></div>}
 
@@ -491,6 +592,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
       {formOpen && <Modal title={editing ? "Edit document" : "Quick routing log"} onClose={() => { setFormOpen(false); setEditing(null); }} wide><DocumentForm document={editing} existingDocuments={documents.map((item) => ({ id: item.id, type: item.type, requestNo: item.requestNo }))} ownerOptions={isAdmin ? activeOwnerOptions : undefined} ownerUid={ownerUid} onOwnerChange={setOwnerUid} onSubmit={saveDocument} onCancel={() => { setFormOpen(false); setEditing(null); }} /></Modal>}
       {selected && <Modal title={`${selected.type} ${selected.requestNo}`} onClose={() => setSelectedId(null)} wide><DocumentDetails user={user} document={{ ...selected, ownerName: userMap.get(selected.ownerUid)?.displayName || selected.ownerName, ownerEmail: userMap.get(selected.ownerUid)?.email || selected.ownerEmail }} onEdit={() => { setSelectedId(null); editDocument(selected); }} notify={notify} /></Modal>}
       {userFormOpen && isAdmin && <Modal title={editingUser ? "Edit user account" : "Create user account"} onClose={() => { setUserFormOpen(false); setEditingUser(null); }}><UserForm profile={editingUser} isSelf={editingUser?.uid === user.uid} onSubmit={saveUserAccount} onCancel={() => { setUserFormOpen(false); setEditingUser(null); }} /></Modal>}
+      <IdleSessionGuard onTimeout={() => void logout()} onWarning={(message) => notify(message)} />
       <RouteTrackAssistant documents={documents} routeHistoryIndex={routeHistoryIndex} user={user} onOpenDocument={(id) => { setSelectedId(id); setView("documents"); }} />
       {toast && <div className={`toast ${toast.error ? "toast-error" : ""}`}>{toast.message}</div>}
     </div>
@@ -508,12 +610,38 @@ function Filters({ search, setSearch, typeFilter, setTypeFilter, statusFilter, s
   return <div className="filter-row"><div className="search-box"><Search size={18} /><input placeholder="Search number, person, supplier, office…" value={search} onChange={(event) => setSearch(event.target.value)} /></div><select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All</option>{DOCUMENT_TYPES.map((item) => <option key={item}>{item}</option>)}</select>{statusFilter !== undefined && setStatusFilter && <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All</option>{DOCUMENT_STATUSES.map((item) => <option key={item}>{item}</option>)}</select>}<button className="secondary-button" onClick={onExport}><Download size={16} /> Export CSV</button></div>;
 }
 
-function DocumentTable({ documents, loading, onOpen, showOwner = false, userMap, requestCounts }: {
-  documents: DocumentRecord[]; loading: boolean; onOpen: (document: DocumentRecord) => void; showOwner?: boolean; userMap: Map<string, UserProfile>; requestCounts: Record<string, number>;
+function DocumentTable({
+  documents,
+  loading,
+  onOpen,
+  showOwner = false,
+  userMap,
+  requestCounts,
+  selectable = false,
+  selectedIds = new Set<string>(),
+  onToggleSelect,
+  onToggleAll,
+}: {
+  documents: DocumentRecord[];
+  loading: boolean;
+  onOpen: (document: DocumentRecord) => void;
+  showOwner?: boolean;
+  userMap: Map<string, UserProfile>;
+  requestCounts: Record<string, number>;
+  selectable?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
+  onToggleAll?: () => void;
 }) {
   if (loading) return <div className="loading-panel">Loading records…</div>;
   if (!documents.length) return <div className="empty-panel">No documents found. Use Quick log to add your first record.</div>;
-  return <div className="table-wrap"><table className={showOwner ? "admin-document-table" : ""}><thead><tr><th>Document</th>{showOwner && <th>Recorded by</th>}<th>Routed date</th><th>Current holder</th><th>Requester / supplier</th><th>Amount / terms</th><th>Status</th></tr></thead><tbody>{documents.map((item) => { const owner = userMap.get(item.ownerUid); const duplicate = requestCounts[item.requestNo.trim().toLowerCase()] > 1; return <tr key={item.id} onClick={() => onOpen(item)}><td><strong>{item.type} {item.requestNo}</strong><span>{item.organization || "No organization"}{duplicate ? " · Duplicate" : ""}</span></td>{showOwner && <td><strong>{owner?.displayName || item.ownerName}</strong><span>{owner?.department || item.ownerEmail}</span></td>}<td>{formatDateTime(item.lastRoutedAt || item.createdAt)}</td><td><strong>{item.currentHolder}</strong><span>{item.lastRoutePurpose || ""}</span></td><td><strong>{item.purchasingEmployee || item.requestor || "—"}</strong><span>{item.supplier || ""}</span></td><td><strong>{item.amount ? formatCurrency(item.amount) : "—"}</strong><span>{item.paymentTerms || ""}</span></td><td><span className={statusClass(item.status)}>{item.status}</span></td></tr>; })}</tbody></table></div>;
+  const allSelected = selectable && documents.every((item) => selectedIds.has(item.id));
+  return <div className="table-wrap"><table className={showOwner ? "admin-document-table" : ""}><thead><tr>{selectable && <th className="select-column"><input type="checkbox" checked={allSelected} onChange={onToggleAll} aria-label="Select all documents" /></th>}<th>Document</th>{showOwner && <th>Recorded by</th>}<th>Routed date</th><th>Current holder</th><th>Requester / supplier</th><th>Amount / terms</th><th>Status</th></tr></thead><tbody>{documents.map((item) => {
+    const owner = userMap.get(item.ownerUid);
+    const duplicate = requestCounts[item.requestNo.trim().toLowerCase()] > 1;
+    const age = Math.max(0, Math.floor((Date.now() - new Date(item.lastRoutedAt || item.updatedAt || item.createdAt).getTime()) / 86_400_000));
+    return <tr key={item.id} onClick={() => onOpen(item)} className={selectedIds.has(item.id) ? "selected-row" : ""}>{selectable && <td className="select-column" onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => onToggleSelect?.(item.id)} aria-label={`Select ${item.type} ${item.requestNo}`} /></td>}<td><strong>{item.type} {item.requestNo}</strong><span>{item.organization || "No organization"}{duplicate ? " · Duplicate" : ""}{age > Number(item.slaDays || 3) ? ` · Overdue ${age}d` : ""}</span></td>{showOwner && <td><strong>{owner?.displayName || item.ownerName}</strong><span>{owner?.department || item.ownerEmail}</span></td>}<td>{formatDateTime(item.lastRoutedAt || item.createdAt)}</td><td><strong>{item.currentHolder}</strong><span>{item.lastRoutePurpose || ""}</span></td><td><strong>{item.purchasingEmployee || item.requestor || "—"}</strong><span>{item.supplier || ""}</span></td><td><strong>{item.amount ? formatCurrency(item.amount) : "—"}</strong><span>{item.paymentTerms || ""}</span></td><td><span className={statusClass(item.status)}>{item.status}</span></td></tr>;
+  })}</tbody></table></div>;
 }
 
 function RoutingTable({ documents, loading, onOpen, showOwner = false, userMap = new Map() }: {

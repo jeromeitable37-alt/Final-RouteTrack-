@@ -1,6 +1,13 @@
 import { FirebaseApp, getApps, initializeApp } from "firebase/app";
 import { Auth, getAuth } from "firebase/auth";
-import { Firestore, getFirestore } from "firebase/firestore";
+import {
+  Firestore,
+  getFirestore,
+  initializeFirestore,
+  memoryLocalCache,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
 
 export const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -25,5 +32,21 @@ export let db: Firestore | null = null;
 if (firebaseConfigured) {
   app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
   auth = getAuth(app);
-  db = getFirestore(app);
+
+  try {
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    });
+  } catch {
+    // Fall back to memory cache when IndexedDB persistence is unavailable,
+    // blocked by the browser, or Firestore was already initialized.
+    try {
+      db = initializeFirestore(app, { localCache: memoryLocalCache() });
+    } catch {
+      // A previous initialization may already own the Firestore instance.
+      db = getFirestore(app);
+    }
+  }
 }
