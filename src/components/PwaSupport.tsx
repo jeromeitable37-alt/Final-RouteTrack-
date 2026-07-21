@@ -171,3 +171,6 @@ export function PwaSupport() {
   }, []);
   return null;
 }
+
+// Backward-compatible export used by src/app/layout.tsx
+export const PwaRegister = PwaSupport;
