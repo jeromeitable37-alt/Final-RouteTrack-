@@ -1,0 +1,74 @@
+ROUTETRACK PROFILE AND THEME READABILITY ENHANCEMENT
+
+This patch updates the existing RouteTrack GitHub/Vercel project.
+Do not create another repository or Vercel project.
+
+WHAT WAS IMPROVED
+- Redesigned professional My Profile page
+- Cleaner text hierarchy, headings, labels, descriptions, and spacing
+- Stronger contrast in both light mode and dark mode
+- Fixed text, placeholders, cards, tables, buttons, notification text, and forms
+  that could become difficult to read in either appearance
+- Better focus outlines for keyboard accessibility
+- More consistent card surfaces and borders throughout the system
+- Clear Required and Optional field badges
+- Improved Account and Security section
+- Improved password-reset explanation
+- Responsive two-column profile workspace on large screens
+- Clean one-column layout on phones and tablets
+- Display Preferences inside My Profile:
+  * Standard or Comfortable spacing
+  * Higher contrast mode
+  * Reduced motion
+- Display preferences are stored only on the current device
+- Existing dark mode, push notifications, messages, AI assistant, charts,
+  reports, QR scanner, and operations features are preserved
+
+FILES REPLACED
+- src/components/ProfileForm.tsx
+- src/components/AppShell.tsx
+- src/app/globals.css
+
+INSTALLATION
+1. Back up the current RouteTrack project folder.
+2. Extract RouteTrack_Profile_And_Theme_Readability_Enhancement_Patch.zip.
+3. Copy the included src folder into the root of the existing project.
+4. Choose "Replace the files in the destination".
+5. Keep the existing .git folder and .env.local file.
+6. Run:
+   npm run build
+
+DEPLOY TO THE SAME PROJECT
+7. Run:
+   git add .
+   git commit -m "Improve profile design and light dark readability"
+   git push origin main
+8. Wait for the existing Vercel deployment to become Ready.
+9. Open the existing RouteTrack URL and press Ctrl + Shift + R.
+
+TEST CHECKLIST
+- Open My Profile in light mode
+- Open My Profile in dark mode
+- Check input labels, helper text, placeholders, and summary cards
+- Test Standard and Comfortable spacing
+- Enable Higher contrast
+- Enable Reduce motion
+- Edit and save the profile
+- Test password reset link
+- Check Dashboard, Documents, Messages, Notifications, Reports, and Security
+  in both light and dark mode
+- Check the page on a phone-sized screen
+
+NO EXTRA SETUP
+- No npm install is required
+- No Firestore Rules update is required
+- No Firebase environment-variable change is required
+- No new Firebase collection is required
+
+BUILD VERIFICATION
+The cumulative project was successfully production-built with:
+- Next.js 16.2.10
+- TypeScript validation
+- Static route generation
+- AI and push-notification API routes
+- Firebase messaging service-worker route

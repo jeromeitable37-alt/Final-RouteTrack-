@@ -1,1 +1,2 @@
 Production build completed successfully with Next.js 16.2.10 and TypeScript.
+Routes include AI assistant, push notification APIs, Firebase messaging service worker, and manifest.
