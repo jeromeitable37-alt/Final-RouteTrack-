@@ -88,6 +88,17 @@ function normalizeStatus(status: unknown): string {
   return String(status || "").trim().toLowerCase();
 }
 
+function documentNumberKey(
+  type: unknown,
+  requestNo: unknown
+): string {
+  return `${String(type || "").trim().toLowerCase()}::${String(
+    requestNo || ""
+  )
+    .trim()
+    .toLowerCase()}`;
+}
+
 export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogout: () => void }) {
   const isAdmin = isAdminRole(user.role);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -205,11 +216,26 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
   const visibleDocuments = documents.filter((item) => !item.archivedAt);
   const archivedDocuments = documents.filter((item) => Boolean(item.archivedAt));
 
-  const requestCounts = useMemo(() => visibleDocuments.reduce<Record<string, number>>((acc, item) => {
-    const key = item.requestNo.trim().toLowerCase();
-    if (key) acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {}), [visibleDocuments]);
+  const requestCounts = useMemo(
+    () =>
+      visibleDocuments.reduce<Record<string, number>>(
+        (acc, item) => {
+          const requestNo = item.requestNo.trim();
+
+          if (requestNo) {
+            const key = documentNumberKey(
+              item.type,
+              requestNo
+            );
+            acc[key] = (acc[key] || 0) + 1;
+          }
+
+          return acc;
+        },
+        {}
+      ),
+    [visibleDocuments]
+  );
 
   const missing = visibleDocuments.filter((item) => normalizeStatus(item.status) === "missing");
   const completed = visibleDocuments.filter((item) => normalizeStatus(item.status) === "completed");
@@ -230,7 +256,12 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
     const last = item.lastRoutedAt || item.updatedAt || item.createdAt;
     return Date.now() - new Date(last).getTime() > 3 * 86_400_000;
   });
-  const duplicates = visibleDocuments.filter((item) => requestCounts[item.requestNo.trim().toLowerCase()] > 1);
+  const duplicates = visibleDocuments.filter(
+    (item) =>
+      requestCounts[
+        documentNumberKey(item.type, item.requestNo)
+      ] > 1
+  );
   const alerts = [...new Map([...missing, ...unacknowledged, ...stalled, ...duplicates].map((item) => [item.id, item])).values()];
 
   const localToday = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
@@ -626,7 +657,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
       {view === "users" && isAdmin ? <button className="mobile-fab" onClick={newUser}><UserPlus size={22} /></button> : view !== "profile" && view !== "messages" && <button className="mobile-fab" onClick={newDocument}><FilePlus2 size={22} /></button>}
       <nav className={`mobile-nav ${isAdmin ? "mobile-nav-admin" : ""}`}><button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}><BarChart3 size={19} /><span>Home</span></button><button className={view === "documents" ? "active" : ""} onClick={() => setView("documents")}><ClipboardList size={19} /><span>Documents</span></button><button className={view === "routes" ? "active" : ""} onClick={() => setView("routes")}><Clock3 size={19} /><span>Routes</span></button><button className={view === "alerts" ? "active" : ""} onClick={() => setView("alerts")}><ShieldAlert size={19} /><span>Check</span></button><button className={view === "messages" ? "active" : ""} onClick={() => setView("messages")}><MessageCircle size={19} /><span>Messages{unreadMessages > 0 ? ` (${unreadMessages})` : ""}</span></button>{isAdmin && <button className={view === "users" ? "active" : ""} onClick={() => setView("users")}><Users size={19} /><span>Users</span></button>}</nav>
 
-      {formOpen && <Modal title={editing ? "Edit document" : "Quick routing log"} onClose={() => { setFormOpen(false); setEditing(null); }} wide><DocumentForm document={editing} existingDocuments={documents.map((item) => ({ id: item.id, type: item.type, requestNo: item.requestNo }))} ownerOptions={isAdmin ? activeOwnerOptions : undefined} ownerUid={ownerUid} onOwnerChange={setOwnerUid} onSubmit={saveDocument} onCancel={() => { setFormOpen(false); setEditing(null); }} /></Modal>}
+      {formOpen && <Modal title={editing ? "Edit document" : "Quick routing log"} onClose={() => { setFormOpen(false); setEditing(null); }} wide><DocumentForm document={editing} existingDocuments={documents} ownerOptions={isAdmin ? activeOwnerOptions : undefined} ownerUid={ownerUid} onOwnerChange={setOwnerUid} onSubmit={saveDocument} onCancel={() => { setFormOpen(false); setEditing(null); }} /></Modal>}
       {selected && <Modal title={`${selected.type} ${selected.requestNo}`} onClose={() => setSelectedId(null)} wide><DocumentDetails user={user} document={{ ...selected, ownerName: userMap.get(selected.ownerUid)?.displayName || selected.ownerName, ownerEmail: userMap.get(selected.ownerUid)?.email || selected.ownerEmail }} onEdit={() => { setSelectedId(null); editDocument(selected); }} notify={notify} /></Modal>}
       {userFormOpen && isAdmin && <Modal title={editingUser ? "Edit user account" : "Create user account"} onClose={() => { setUserFormOpen(false); setEditingUser(null); }}><UserForm profile={editingUser} isSelf={editingUser?.uid === user.uid} onSubmit={saveUserAccount} onCancel={() => { setUserFormOpen(false); setEditingUser(null); }} /></Modal>}
       <IdleSessionGuard onTimeout={() => void logout()} onWarning={(message) => notify(message)} />
@@ -675,7 +706,10 @@ function DocumentTable({
   const allSelected = selectable && documents.every((item) => selectedIds.has(item.id));
   return <div className="table-wrap"><table className={showOwner ? "admin-document-table" : ""}><thead><tr>{selectable && <th className="select-column"><input type="checkbox" checked={allSelected} onChange={onToggleAll} aria-label="Select all documents" /></th>}<th>Document</th>{showOwner && <th>Recorded by</th>}<th>Routed date</th><th>Current holder</th><th>Requester / supplier</th><th>Amount / terms</th><th>Status</th></tr></thead><tbody>{documents.map((item) => {
     const owner = userMap.get(item.ownerUid);
-    const duplicate = requestCounts[item.requestNo.trim().toLowerCase()] > 1;
+    const duplicate =
+      requestCounts[
+        documentNumberKey(item.type, item.requestNo)
+      ] > 1;
     const age = Math.max(0, Math.floor((Date.now() - new Date(item.lastRoutedAt || item.updatedAt || item.createdAt).getTime()) / 86_400_000));
     return <tr key={item.id} onClick={() => onOpen(item)} className={selectedIds.has(item.id) ? "selected-row" : ""}>{selectable && <td className="select-column" onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => onToggleSelect?.(item.id)} aria-label={`Select ${item.type} ${item.requestNo}`} /></td>}<td><strong>{item.type} {item.requestNo}</strong><span>{item.organization || "No organization"}{duplicate ? " · Duplicate" : ""}{age > Number(item.slaDays || 3) ? ` · Overdue ${age}d` : ""}</span></td>{showOwner && <td><strong>{owner?.displayName || item.ownerName}</strong><span>{owner?.department || item.ownerEmail}</span></td>}<td>{formatDateTime(item.lastRoutedAt || item.createdAt)}</td><td><strong>{item.currentHolder}</strong><span>{item.lastRoutePurpose || ""}</span></td><td><strong>{item.purchasingEmployee || item.requestor || "—"}</strong><span>{item.supplier || ""}</span></td><td><strong>{item.amount ? formatCurrency(item.amount) : "—"}</strong><span>{item.paymentTerms || ""}</span></td><td><span className={statusClass(item.status)}>{item.status}</span></td></tr>;
   })}</tbody></table></div>;

@@ -111,56 +111,112 @@ export const ROUTING_TEMPLATES: RoutingTemplate[] = [
     purpose: "Treasury / accounting approval",
   },
   {
-    id: "po-supplier",
-    label: "PO — Forward to supplier",
+    id: "po-amd",
+    label: "PO — Route to AMD",
     type: "PO",
     organization: "SISC",
-    destination: "Supplier / Vendor",
-    purpose: "Forwarded to supplier",
+    destination: "AMD — Receiving Department",
+    purpose: "Product receiving / AMD acknowledgment",
   },
 ];
 
-export function isSiscDocument(organization: string, requestNo: string): boolean {
+export function isSiscDocument(
+  organization: string,
+  requestNo: string
+): boolean {
   const normalizedOrg = organization.trim().toLowerCase();
   const normalizedNo = requestNo.trim().toUpperCase();
-  return normalizedOrg === "sisc" || normalizedNo.startsWith("SO") || normalizedNo.startsWith("10");
+
+  return (
+    normalizedOrg === "sisc" ||
+    normalizedNo.startsWith("SO") ||
+    normalizedNo.startsWith("10")
+  );
 }
 
-export function suggestedInitialDestination(type: DocumentType, organization: string, requestNo: string): string {
-  if (type === "PO") return "Supplier / Vendor";
+export function suggestedInitialDestination(
+  type: DocumentType,
+  organization: string,
+  requestNo: string
+): string {
+  if (type === "PO") {
+    return "AMD — Receiving Department";
+  }
+
   if (type === "CRF") {
     return isSiscDocument(organization, requestNo)
       ? "Sir Marc Marquez — Treasury / Accounting"
       : "Ms. Lorie — Accounting / Treasury (Non-SISC)";
   }
+
   return "Ms. Jorge Balela — Admin / Budget Owner";
 }
 
 export function suggestedPurpose(destination: string): string {
   const value = destination.toLowerCase();
-  if (value.includes("jorge")) return "First signature / budget owner approval";
-  if (value.includes("marc")) return "Treasury / accounting approval";
-  if (value.includes("trixie")) return "Audit review";
-  if (value.includes("lorie") && value.includes("accounting")) return "Treasury / accounting approval";
-  if (value.includes("dr. jo") || (value.includes("lorie") && value.includes("final"))) return "Final signature / approval";
-  if (value.includes("supplier")) return "Forwarded to supplier";
-  if (value.includes("amd")) return "Product receiving / AMD acknowledgment";
+
+  if (value.includes("jorge")) {
+    return "First signature / budget owner approval";
+  }
+
+  if (value.includes("marc")) {
+    return "Treasury / accounting approval";
+  }
+
+  if (value.includes("trixie")) {
+    return "Audit review";
+  }
+
+  if (
+    value.includes("lorie") &&
+    value.includes("accounting")
+  ) {
+    return "Treasury / accounting approval";
+  }
+
+  if (
+    value.includes("dr. jo") ||
+    (value.includes("lorie") && value.includes("final"))
+  ) {
+    return "Final signature / approval";
+  }
+
+  if (value.includes("supplier")) {
+    return "Forwarded to supplier";
+  }
+
+  if (value.includes("amd")) {
+    return "Product receiving / AMD acknowledgment";
+  }
+
   return "For review / signature";
 }
 
-export function nextRouteSuggestions(document: DocumentRecord): string[] {
-  const current = (document.currentHolder || document.lastToOffice || "").toLowerCase();
+export function nextRouteSuggestions(
+  document: DocumentRecord
+): string[] {
+  const current = (
+    document.currentHolder ||
+    document.lastToOffice ||
+    ""
+  ).toLowerCase();
+
   const org = document.organization || "";
 
   if (document.type === "PO") {
-    if (current.includes("supplier")) return ["AMD — Receiving Department"];
-    return ["Supplier / Vendor", "AMD — Receiving Department"];
+    return ["AMD — Receiving Department"];
   }
 
   if (document.type === "CRF") {
     return isSiscDocument(org, document.requestNo)
-      ? ["Sir Marc Marquez — Treasury / Accounting", "Ms. Lorie — Final Signatory"]
-      : ["Ms. Lorie — Accounting / Treasury (Non-SISC)", "Ms. Lorie — Final Signatory"];
+      ? [
+          "Sir Marc Marquez — Treasury / Accounting",
+          "Ms. Lorie — Final Signatory",
+        ]
+      : [
+          "Ms. Lorie — Accounting / Treasury (Non-SISC)",
+          "Ms. Lorie — Final Signatory",
+        ];
   }
 
   if (current.includes("jorge")) {
@@ -168,12 +224,22 @@ export function nextRouteSuggestions(document: DocumentRecord): string[] {
       ? ["Sir Marc Marquez — Treasury / Accounting"]
       : ["Ms. Lorie — Accounting / Treasury (Non-SISC)"];
   }
-  if (current.includes("marc") || (current.includes("lorie") && current.includes("accounting"))) {
+
+  if (
+    current.includes("marc") ||
+    (current.includes("lorie") &&
+      current.includes("accounting"))
+  ) {
     return ["Ms. Trixie Araneta — Audit Department"];
   }
+
   if (current.includes("trixie")) {
-    return ["Ms. Lorie — Final Signatory", "Dr. Jo — Final Signatory"];
+    return [
+      "Ms. Lorie — Final Signatory",
+      "Dr. Jo — Final Signatory",
+    ];
   }
+
   return [
     "Ms. Jorge Balela — Admin / Budget Owner",
     isSiscDocument(org, document.requestNo)

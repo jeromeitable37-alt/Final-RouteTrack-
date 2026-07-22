@@ -221,10 +221,7 @@ export function DocumentForm({
   onCancel,
 }: {
   document?: DocumentRecord | null;
-  existingDocuments: Pick<
-    DocumentRecord,
-    "id" | "type" | "requestNo"
-  >[];
+  existingDocuments: DocumentRecord[];
   ownerOptions?: UserProfile[];
   ownerUid?: string;
   onOwnerChange?: (uid: string) => void;
@@ -259,8 +256,21 @@ export function DocumentForm({
       } satisfies DocumentInput)
     : baseDocument();
 
+  const initialRelatedCrf =
+    initial.type === "PO"
+      ? existingDocuments.find(
+          (item) =>
+            item.type === "CRF" &&
+            item.requestNo.trim().toLowerCase() ===
+              initial.requestNo.trim().toLowerCase()
+        )
+      : undefined;
+
   const [form, setForm] = useState<DocumentInput>(initial);
   const [templateId, setTemplateId] = useState("");
+  const [linkedCrfId, setLinkedCrfId] = useState(
+    initialRelatedCrf?.id || ""
+  );
 
   const [dateTimeRouted, setDateTimeRouted] = useState(
     document?.lastRoutedAt || nowLocalInput()
@@ -285,13 +295,35 @@ export function DocumentForm({
 
   const normalized = form.requestNo.trim().toLowerCase();
 
-  const duplicateDocument = Boolean(normalized)
-    ? existingDocuments.find(
-        (item) =>
-          item.id !== document?.id &&
-          item.requestNo.trim().toLowerCase() === normalized
-      )
+  const crfDocuments = useMemo(
+    () =>
+      existingDocuments
+        .filter(
+          (item) =>
+            item.type === "CRF" &&
+            item.id !== document?.id
+        )
+        .sort((a, b) =>
+          b.requestNo.localeCompare(a.requestNo, undefined, {
+            numeric: true,
+          })
+        ),
+    [existingDocuments, document?.id]
+  );
+
+  const linkedCrf = linkedCrfId
+    ? crfDocuments.find((item) => item.id === linkedCrfId)
     : undefined;
+
+  const duplicateDocument =
+    !saving && Boolean(normalized)
+      ? existingDocuments.find(
+          (item) =>
+            item.id !== document?.id &&
+            item.type === form.type &&
+            item.requestNo.trim().toLowerCase() === normalized
+        )
+      : undefined;
 
   const duplicate = Boolean(duplicateDocument);
 
@@ -396,22 +428,127 @@ export function DocumentForm({
     setRoutePurpose(suggestedPurpose(destination));
   }
 
+  function findMatchingCrf(requestNo: string) {
+    const normalizedNumber = requestNo.trim().toLowerCase();
+
+    if (!normalizedNumber) {
+      return undefined;
+    }
+
+    return crfDocuments.find(
+      (item) =>
+        item.requestNo.trim().toLowerCase() === normalizedNumber
+    );
+  }
+
+  function copyCrfDetails(
+    current: DocumentInput,
+    crf: DocumentRecord
+  ): DocumentInput {
+    const purchasingEmployee = String(
+      crf.purchasingEmployee ||
+        crf.requestor ||
+        current.purchasingEmployee ||
+        current.requestor ||
+        ""
+    );
+
+    const description = String(
+      crf.itemsDescription ||
+        crf.subjectPurpose ||
+        current.itemsDescription ||
+        current.subjectPurpose ||
+        ""
+    );
+
+    return {
+      ...current,
+      organization:
+        crf.organization || current.organization,
+      requestingDepartment:
+        crf.requestingDepartment ||
+        current.requestingDepartment,
+      requestor: purchasingEmployee,
+      purchasingEmployee,
+      amount:
+        Number(crf.amount) > 0
+          ? Number(crf.amount)
+          : current.amount,
+      supplier: crf.supplier || current.supplier,
+      subjectPurpose: description,
+      itemsDescription: description,
+    };
+  }
+
+  function selectRelatedCrf(id: string) {
+    setLinkedCrfId(id);
+
+    const crf = crfDocuments.find((item) => item.id === id);
+
+    if (!crf) {
+      return;
+    }
+
+    setForm((current) => copyCrfDetails(current, crf));
+  }
+
   function changeType(type: DocumentInput["type"]) {
-    const next: DocumentInput = {
+    let next: DocumentInput = {
       ...form,
       type,
     };
 
     if (type === "PO") {
       next.status = "In Transit";
+
+      const matchingCrf = findMatchingCrf(next.requestNo);
+
+      if (matchingCrf) {
+        next = copyCrfDetails(next, matchingCrf);
+        setLinkedCrfId(matchingCrf.id);
+      } else {
+        setLinkedCrfId("");
+      }
+    } else {
+      setLinkedCrfId("");
     }
 
     setForm(next);
+
+    if (type === "PO" && !document) {
+      const destination = suggestedInitialDestination(
+        type,
+        next.organization || "",
+        next.requestNo
+      );
+
+      setRouteTouched(false);
+      setRouteTo(destination);
+      setRoutePurpose(suggestedPurpose(destination));
+      return;
+    }
+
     applyAutoRoute({ type });
   }
 
   function changeRequestNo(requestNo: string) {
-    update("requestNo", requestNo);
+    const matchingCrf =
+      form.type === "PO"
+        ? findMatchingCrf(requestNo)
+        : undefined;
+
+    setForm((current) => {
+      const next = {
+        ...current,
+        requestNo,
+      };
+
+      return matchingCrf
+        ? copyCrfDetails(next, matchingCrf)
+        : next;
+    });
+
+    setLinkedCrfId(matchingCrf?.id || "");
     applyAutoRoute({ requestNo });
   }
 
@@ -434,7 +571,7 @@ export function DocumentForm({
       ...current,
       type: template.type,
       organization: template.organization,
-      status: template.type === "CRF" || template.type === "PO" ? "Completed" : "In Transit",
+      status: "In Transit",
     }));
     setRouteTouched(true);
     setRouteTo(template.destination);
@@ -472,14 +609,9 @@ export function DocumentForm({
         dateLogged: dateTimeRouted.slice(0, 10),
         currentHolder: routeTo.trim(),
 
-        // CRF and PO are completed after the first routing entry.
-        // PRF and SRF remain active until manually completed.
-        status:
-          form.type === "CRF" || form.type === "PO"
-            ? "Completed"
-            : document
-              ? form.status
-              : "In Transit",
+        // New records remain In Transit until receipt is acknowledged.
+        // CRF and PO are then completed automatically without a Route next step.
+        status: document ? form.status : "In Transit",
       };
 
       await onSubmit({
@@ -523,7 +655,7 @@ export function DocumentForm({
 
         <span>
           {isCrf || isPo
-            ? `${form.type} will be marked Completed after saving. No additional routing is required.`
+            ? `${form.type} will remain In Transit until receipt is acknowledged. No Route next step is required.`
             : "Only the fields marked required must be completed."}
         </span>
       </section>
@@ -601,9 +733,9 @@ export function DocumentForm({
 
           {duplicate && duplicateDocument && (
             <span className="field-error">
-              This number is already used by {duplicateDocument.type}{" "}
-              {duplicateDocument.requestNo}. Every PRF, SRF, CRF, and PO
-              number must be unique.
+              A {duplicateDocument.type} record with number{" "}
+              {duplicateDocument.requestNo} already exists. CRF and PO
+              may share a number, but two {form.type} records cannot.
             </span>
           )}
         </label>
@@ -736,6 +868,42 @@ export function DocumentForm({
 
         {isPo && (
           <>
+            <label className="span-2">
+              Related CRF / copy details
+
+              <select
+                value={linkedCrfId}
+                onChange={(event) =>
+                  selectRelatedCrf(event.target.value)
+                }
+              >
+                <option value="">
+                  No CRF selected — enter a matching CRF number above
+                </option>
+
+                {crfDocuments.map((crf) => (
+                  <option key={crf.id} value={crf.id}>
+                    CRF {crf.requestNo}
+                    {crf.supplier ? ` — ${crf.supplier}` : ""}
+                  </option>
+                ))}
+              </select>
+
+              <span className="field-help">
+                When the PO number matches an existing CRF number,
+                RouteTrack automatically copies the organization,
+                requesting department, purchasing employee, supplier,
+                amount, and description. You can also choose a CRF
+                manually when the PO number is different.
+              </span>
+
+              {linkedCrf && (
+                <span className="field-help">
+                  Details copied from CRF {linkedCrf.requestNo}.
+                </span>
+              )}
+            </label>
+
             <label>
               Date forwarded to supplier
 
@@ -929,10 +1097,10 @@ export function DocumentForm({
 
         {(isCrf || isPo) && (
           <div className="span-2">
-            <strong>Document status: Completed</strong>
+            <strong>Document status: In Transit</strong>
             <p className="field-help">
-              {form.type} is closed after this routing entry. There is no
-              Route next step.
+              {form.type} will be marked Completed automatically after
+              receipt is acknowledged. There is no Route next step.
             </p>
           </div>
         )}
@@ -958,11 +1126,13 @@ export function DocumentForm({
         >
           {duplicate && duplicateDocument ? (
             <>
-              <strong>Unable to save: duplicate document number.</strong>
+              <strong>
+                Unable to save: duplicate {form.type} number.
+              </strong>
               <span>
                 {duplicateDocument.type} {duplicateDocument.requestNo} already
-                uses this number. Enter a unique number for all PRF, SRF, CRF,
-                and PO records.
+                uses this number. CRF and PO may share a number, but each
+                document type can use a number only once.
               </span>
             </>
           ) : (
