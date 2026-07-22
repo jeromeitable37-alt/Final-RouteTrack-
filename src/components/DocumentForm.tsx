@@ -256,21 +256,10 @@ export function DocumentForm({
       } satisfies DocumentInput)
     : baseDocument();
 
-  const initialRelatedCrf =
-    initial.type === "PO"
-      ? existingDocuments.find(
-          (item) =>
-            item.type === "CRF" &&
-            item.requestNo.trim().toLowerCase() ===
-              initial.requestNo.trim().toLowerCase()
-        )
-      : undefined;
-
   const [form, setForm] = useState<DocumentInput>(initial);
   const [templateId, setTemplateId] = useState("");
-  const [linkedCrfId, setLinkedCrfId] = useState(
-    initialRelatedCrf?.id || ""
-  );
+  const [relatedCrfNumber, setRelatedCrfNumber] = useState("");
+  const [linkedCrfId, setLinkedCrfId] = useState("");
 
   const [dateTimeRouted, setDateTimeRouted] = useState(
     document?.lastRoutedAt || nowLocalInput()
@@ -428,8 +417,8 @@ export function DocumentForm({
     setRoutePurpose(suggestedPurpose(destination));
   }
 
-  function findMatchingCrf(requestNo: string) {
-    const normalizedNumber = requestNo.trim().toLowerCase();
+  function findCrfByNumber(crfNumber: string) {
+    const normalizedNumber = crfNumber.trim().toLowerCase();
 
     if (!normalizedNumber) {
       return undefined;
@@ -480,10 +469,11 @@ export function DocumentForm({
     };
   }
 
-  function selectRelatedCrf(id: string) {
-    setLinkedCrfId(id);
+  function changeRelatedCrfNumber(value: string) {
+    setRelatedCrfNumber(value);
 
-    const crf = crfDocuments.find((item) => item.id === id);
+    const crf = findCrfByNumber(value);
+    setLinkedCrfId(crf?.id || "");
 
     if (!crf) {
       return;
@@ -493,62 +483,40 @@ export function DocumentForm({
   }
 
   function changeType(type: DocumentInput["type"]) {
-    let next: DocumentInput = {
+    const next: DocumentInput = {
       ...form,
       type,
+      status: "In Transit",
     };
-
-    if (type === "PO") {
-      next.status = "In Transit";
-
-      const matchingCrf = findMatchingCrf(next.requestNo);
-
-      if (matchingCrf) {
-        next = copyCrfDetails(next, matchingCrf);
-        setLinkedCrfId(matchingCrf.id);
-      } else {
-        setLinkedCrfId("");
-      }
-    } else {
-      setLinkedCrfId("");
-    }
 
     setForm(next);
 
-    if (type === "PO" && !document) {
-      const destination = suggestedInitialDestination(
-        type,
-        next.organization || "",
-        next.requestNo
-      );
+    if (type === "PO") {
+      setRelatedCrfNumber("");
+      setLinkedCrfId("");
 
-      setRouteTouched(false);
-      setRouteTo(destination);
-      setRoutePurpose(suggestedPurpose(destination));
-      return;
+      if (!document) {
+        const destination = suggestedInitialDestination(
+          type,
+          next.organization || "",
+          next.requestNo
+        );
+
+        setRouteTouched(false);
+        setRouteTo(destination);
+        setRoutePurpose(suggestedPurpose(destination));
+        return;
+      }
+    } else {
+      setRelatedCrfNumber("");
+      setLinkedCrfId("");
     }
 
     applyAutoRoute({ type });
   }
 
   function changeRequestNo(requestNo: string) {
-    const matchingCrf =
-      form.type === "PO"
-        ? findMatchingCrf(requestNo)
-        : undefined;
-
-    setForm((current) => {
-      const next = {
-        ...current,
-        requestNo,
-      };
-
-      return matchingCrf
-        ? copyCrfDetails(next, matchingCrf)
-        : next;
-    });
-
-    setLinkedCrfId(matchingCrf?.id || "");
+    update("requestNo", requestNo);
     applyAutoRoute({ requestNo });
   }
 
@@ -734,8 +702,8 @@ export function DocumentForm({
           {duplicate && duplicateDocument && (
             <span className="field-error">
               A {duplicateDocument.type} record with number{" "}
-              {duplicateDocument.requestNo} already exists. CRF and PO
-              may share a number, but two {form.type} records cannot.
+              {duplicateDocument.requestNo} already exists. Enter a
+              different {form.type} number.
             </span>
           )}
         </label>
@@ -869,39 +837,47 @@ export function DocumentForm({
         {isPo && (
           <>
             <label className="span-2">
-              Related CRF / copy details
+              Related CRF number
 
-              <select
-                value={linkedCrfId}
+              <input
+                value={relatedCrfNumber}
                 onChange={(event) =>
-                  selectRelatedCrf(event.target.value)
+                  changeRelatedCrfNumber(event.target.value)
                 }
-              >
-                <option value="">
-                  No CRF selected — enter a matching CRF number above
-                </option>
+                placeholder="Enter the CRF number"
+                list="routetrack-crf-number-options"
+                autoComplete="off"
+              />
 
+              <datalist id="routetrack-crf-number-options">
                 {crfDocuments.map((crf) => (
-                  <option key={crf.id} value={crf.id}>
-                    CRF {crf.requestNo}
-                    {crf.supplier ? ` — ${crf.supplier}` : ""}
+                  <option
+                    key={crf.id}
+                    value={crf.requestNo}
+                  >
+                    {crf.supplier || crf.organization || "Saved CRF"}
                   </option>
                 ))}
-              </select>
+              </datalist>
 
               <span className="field-help">
-                When the PO number matches an existing CRF number,
-                RouteTrack automatically copies the organization,
+                Enter the exact CRF number. Once RouteTrack finds the
+                saved CRF, it automatically copies the organization,
                 requesting department, purchasing employee, supplier,
-                amount, and description. You can also choose a CRF
-                manually when the PO number is different.
+                amount, and description into this PO.
               </span>
 
-              {linkedCrf && (
+              {linkedCrf ? (
                 <span className="field-help">
-                  Details copied from CRF {linkedCrf.requestNo}.
+                  CRF {linkedCrf.requestNo} detected. Details copied
+                  successfully.
                 </span>
-              )}
+              ) : relatedCrfNumber.trim().length >= 3 ? (
+                <span className="field-error">
+                  No saved CRF was found with this number. Check the CRF
+                  number and make sure the CRF is visible to your account.
+                </span>
+              ) : null}
             </label>
 
             <label>
