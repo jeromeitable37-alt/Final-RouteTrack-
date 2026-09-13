@@ -1,0 +1,47 @@
+ROUTETRACK — PO CRF NUMBER DETECTION FIX
+
+WHAT CHANGES
+1. PO is routed to AMD by default.
+2. The PO form has a new "Related CRF number" field.
+3. Entering the exact saved CRF number automatically copies:
+   - organization
+   - requesting department
+   - purchasing employee / requisitioner
+   - supplier
+   - amount
+   - description / items
+4. PO number and CRF number may be different.
+5. Duplicate checking is now per document type.
+6. The duplicate warning is suppressed while the new document is being saved.
+
+IMPORTANT
+- The CRF must already be saved in RouteTrack.
+- The CRF must be visible to the signed-in account.
+- The PO number remains separate and is not replaced by the CRF number.
+- No Firestore Rules or environment-variable changes are required.
+
+INSTALL
+1. Extract this ZIP.
+2. Copy the included src folder.
+3. Paste it into the root of the existing RouteTrack project.
+4. Choose Replace the files in the destination.
+
+FILES REPLACED
+- src/components/DocumentForm.tsx
+- src/components/AppShell.tsx
+- src/lib/workflow.ts
+
+BUILD AND DEPLOY
+npm run build
+
+git add src/components/DocumentForm.tsx src/components/AppShell.tsx src/lib/workflow.ts
+git commit -m "Add CRF number detection for PO entry"
+git push origin main
+
+TEST
+1. Save a CRF, for example CRF-2026-015.
+2. Open Quick Log and select PO.
+3. Enter the new PO number, for example PO-8821.
+4. In Related CRF number, enter CRF-2026-015.
+5. Confirm that supplier, amount, employee, organization, department, and description are copied.
+6. Confirm the route destination remains AMD — Receiving Department.

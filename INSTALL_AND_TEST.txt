@@ -1,0 +1,95 @@
+ROUTETRACK — PO AMD DEFAULT + CRF AUTO-FILL + DUPLICATE FIX
+
+FILES INCLUDED
+- src/lib/workflow.ts
+- src/components/DocumentForm.tsx
+- src/components/AppShell.tsx
+
+CHANGES
+
+1. PO DEFAULT ROUTE
+- New PO records now default to:
+  AMD — Receiving Department
+- Default purpose:
+  Product receiving / AMD acknowledgment
+- The PO routing template now routes to AMD instead of Supplier / Vendor.
+
+2. COPY CRF DETAILS INTO PO
+- When the PO number exactly matches an existing CRF number, RouteTrack
+  automatically copies:
+  * Organization
+  * Requesting department
+  * Purchasing employee / requisitioner
+  * Supplier
+  * Amount
+  * Description / items
+- The PO form also includes a "Related CRF / copy details" selector.
+- This selector allows copying details when the PO number and CRF number
+  are different.
+- PO-specific fields are not overwritten:
+  * PO number
+  * Date forwarded to supplier
+  * Payment terms
+  * AMD destination
+
+3. FALSE DUPLICATE WARNING FIX
+- Duplicate checking now uses:
+  Document type + Document number
+- CRF 1001 and PO 1001 are allowed.
+- PO 1001 and another PO 1001 are blocked.
+- The duplicate warning is temporarily suppressed during the active save
+  request so the newly saved record does not warn against itself.
+- Dashboard duplicate alerts use the same corrected rule.
+
+4. CRF / PO STATUS WORDING
+- New CRF and PO records remain In Transit after logging.
+- They are marked Completed after acknowledgment.
+- No Route next step is required.
+
+HOW TO APPLY
+
+1. Extract this ZIP.
+2. Copy the included "src" folder.
+3. Paste it into the root of your existing RouteTrack project.
+4. Choose "Replace the files in the destination."
+
+Then run:
+
+npm run build
+
+When successful:
+
+git add src/lib/workflow.ts src/components/DocumentForm.tsx src/components/AppShell.tsx
+git commit -m "Improve PO and CRF document entry"
+git push origin main
+
+Wait for the existing Vercel deployment to become Ready.
+
+TEST CHECKLIST
+
+A. PO default:
+- Open Quick log.
+- Select PO.
+- Confirm Route to person / department automatically shows:
+  AMD — Receiving Department
+
+B. CRF auto-fill:
+- Create or use an existing CRF, for example CRF 1001.
+- Open Quick log and select PO.
+- Enter 1001 as the PO number.
+- Confirm CRF organization, employee, supplier, amount, and description copy.
+
+C. Manual CRF selection:
+- Select PO.
+- Use "Related CRF / copy details."
+- Choose a CRF with a different number.
+- Confirm the shared information copies while the PO number stays unchanged.
+
+D. Duplicate rule:
+- CRF 1001 + PO 1001: allowed.
+- PO 1001 + another PO 1001: blocked.
+- Saving a new record should not immediately show a duplicate warning against itself.
+
+No npm install is required.
+No Firebase environment variable change is required.
+No Firestore Rules change is required.
