@@ -97,6 +97,21 @@ export interface DocumentRecord {
   nextFollowUpAt?: string;
   followUpCount?: number;
   slaDays?: number;
+  syncSource?: "manual" | "google-sheet";
+  spreadsheetSyncAt?: string;
+  spreadsheetRow?: number;
+  spreadsheetFingerprint?: string;
+  spreadsheetChangedAt?: string;
+  spreadsheetLastStatus?: string;
+  spreadsheetLastHolder?: string;
+  spreadsheetLastRouteAt?: string;
+  automationPriority?: "critical" | "high" | "medium" | "low" | "clear";
+  automationRecommendation?: string;
+  automationReasons?: string[];
+  automationUpdatedAt?: string;
+  isDuplicate?: boolean;
+  duplicateOf?: string;
+  duplicateDetectedAt?: string;
 }
 
 export type DocumentInput = Omit<

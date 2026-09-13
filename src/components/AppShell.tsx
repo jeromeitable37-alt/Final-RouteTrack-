@@ -77,6 +77,7 @@ import { ReportsPage } from "./ReportsPage";
 import { ShiftHandoverPage } from "./ShiftHandoverPage";
 import { IdleSessionGuard, OnlineStatus, SecurityPage } from "./SecurityAndOffline";
 import { sendPushNotification } from "@/lib/push-notifications";
+import { analyzeDocument } from "@/lib/automation";
 
 type View = "dashboard" | "documents" | "routes" | "alerts" | "archive" | "activity" | "messages" | "reports" | "scanner" | "handover" | "security" | "users" | "profile";
 
@@ -213,7 +214,7 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
   const activeOwnerOptions = useMemo(() => users.filter((item) => item.active), [users]);
   const selected = selectedId ? documents.find((item) => item.id === selectedId) || null : null;
 
-  const visibleDocuments = documents.filter((item) => !item.archivedAt);
+  const visibleDocuments = documents.filter((item) => !item.archivedAt && item.isDuplicate !== true);
   const archivedDocuments = documents.filter((item) => Boolean(item.archivedAt));
 
   const requestCounts = useMemo(
@@ -237,7 +238,9 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
     [visibleDocuments]
   );
 
+  const autoChecks = useMemo(() => visibleDocuments.map((item) => [item, analyzeDocument(item)] as const), [visibleDocuments]);
   const missing = visibleDocuments.filter((item) => normalizeStatus(item.status) === "missing");
+  const returned = visibleDocuments.filter((item) => normalizeStatus(item.status).includes("returned"));
   const completed = visibleDocuments.filter((item) => normalizeStatus(item.status) === "completed");
   const active = visibleDocuments.filter((item) => {
     const status = normalizeStatus(item.status);
@@ -262,7 +265,8 @@ export function AppShell({ user, onDemoLogout }: { user: SessionUser; onDemoLogo
         documentNumberKey(item.type, item.requestNo)
       ] > 1
   );
-  const alerts = [...new Map([...missing, ...unacknowledged, ...stalled, ...duplicates].map((item) => [item.id, item])).values()];
+  const autoAttention = autoChecks.filter(([, check]) => check.needsAttention).map(([item]) => item);
+  const alerts = [...new Map([...missing, ...returned, ...unacknowledged, ...stalled, ...duplicates, ...autoAttention].map((item) => [item.id, item])).values()];
 
   const localToday = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
   const routedToday = routingDocuments.filter((item) => String(item.lastRoutedAt || "").slice(0, 10) === localToday);

@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Clock3, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 import { DocumentRecord } from "@/lib/types";
+import { analyzeDocument } from "@/lib/automation";
 
 function normalize(value: unknown): string {
   return String(value || "").trim().toLowerCase();
@@ -44,24 +45,11 @@ export function SmartInsightsPanel({
     return date && date.getFullYear() === previous.getFullYear() && date.getMonth() === previous.getMonth();
   });
 
-  const pendingAcknowledgment = active
-    .filter((item) => {
-      const status = normalize(item.status);
-      const closed = status === "completed" || status === "cancelled";
-      return !closed && !item.lastReceivedBy && ageInDays(item.lastRoutedAt || item.createdAt) >= 1;
-    })
-    .sort((a, b) => ageInDays(b.lastRoutedAt || b.createdAt) - ageInDays(a.lastRoutedAt || a.createdAt));
-
-  const stalled = active
-    .filter((item) => {
-      const status = normalize(item.status);
-      const closed = status === "completed" || status === "cancelled";
-      return !closed && ageInDays(item.lastRoutedAt || item.updatedAt || item.createdAt) >= 3;
-    })
-    .sort((a, b) => ageInDays(b.lastRoutedAt || b.updatedAt || b.createdAt) - ageInDays(a.lastRoutedAt || a.updatedAt || a.createdAt));
-
-  const returned = active.filter((item) => normalize(item.status).includes("returned"));
-  const missing = active.filter((item) => normalize(item.status) === "missing");
+  const checks = active.map((item) => ({ item, check: analyzeDocument(item) }));
+  const pendingAcknowledgment = checks.filter(({ check }) => check.pendingAcknowledgment).map(({ item }) => item).sort((a, b) => ageInDays(b.lastRoutedAt || b.createdAt) - ageInDays(a.lastRoutedAt || a.createdAt));
+  const stalled = checks.filter(({ check }) => check.overdue).map(({ item }) => item).sort((a, b) => ageInDays(b.lastRoutedAt || b.updatedAt || b.createdAt) - ageInDays(a.lastRoutedAt || a.updatedAt || a.createdAt));
+  const returned = checks.filter(({ check }) => check.returned).map(({ item }) => item);
+  const missing = checks.filter(({ check }) => check.missing).map(({ item }) => item);
 
   const holderCounts = new Map<string, number>();
   active.forEach((item) => {
@@ -85,7 +73,7 @@ export function SmartInsightsPanel({
             <span className="smart-live-badge">Live</span>
           </div>
           <h2>What needs attention today</h2>
-          <p>Automatically calculated from the records currently visible to your account.</p>
+          <p>Automatically calculated from the latest synchronized records, routing history, timing, acknowledgment, and spreadsheet changes.</p>
         </div>
         <div className={`smart-trend ${delta >= 0 ? "trend-up" : "trend-down"}`}>
           {delta >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />}

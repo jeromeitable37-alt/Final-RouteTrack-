@@ -126,3 +126,29 @@ Publish the updated `firestore.rules` before using the administrator features. T
 - CRF save now identifies each missing required field.
 - Duplicate numbers are checked within the same document type only.
 - Existing CRF records can be edited and saved without being blocked by a PRF/SRF number match.
+
+## Google Sheets live monitoring automation
+
+The monitoring spreadsheet can now act as the incoming source for RouteTrack. The sync layer:
+
+- Reads the configured Google Sheet worksheet.
+- Normalizes document number/type formats before matching.
+- Reconciles against existing RouteTrack records to avoid creating duplicates for records already entered manually.
+- Processes duplicate spreadsheet rows only once per sync.
+- Updates the latest holder, status, requester, supplier, amount, due date, remarks, and physical location.
+- Detects spreadsheet-driven holder/status changes and appends a source-tagged route/status event in the document history.
+- Calculates automatic attention flags and a recommended next action.
+- Excludes records marked as duplicates from dashboard totals.
+- Stores sync-run statistics in `syncRuns` for administrator monitoring.
+- Writes in chunks of 400 operations to stay below Firestore's batch-write limit.
+
+### Automatic trigger on Vercel Hobby
+
+Vercel Hobby does not allow a 15-minute Vercel Cron schedule, so `vercel.json` uses one daily backup cron. A GitHub Actions workflow is included to trigger the same protected endpoint every 15 minutes.
+
+Add the same `CRON_SECRET` value to:
+
+1. Vercel → Project Settings → Environment Variables
+2. GitHub → Repository Settings → Secrets and variables → Actions → New repository secret
+
+The GitHub workflow calls the deployed RouteTrack URL and uses that secret in the `Authorization: Bearer ...` header. It can also be run manually from the Actions tab using `workflow_dispatch`.

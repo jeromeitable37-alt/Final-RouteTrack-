@@ -1,2 +1,1 @@
-Production build completed successfully with Next.js 16.2.10 and TypeScript.
-Routes include AI assistant, push notification APIs, Firebase messaging service worker, and manifest.
+Build note: the original project was previously build-verified before the automation upgrade. The current container could not complete a fresh production build because dependency installation timed out and the local type-definition packages were incomplete. The automation code was reviewed for the project structure, but run `npm install` and `npm run build` in the project/Vercel before final production verification.

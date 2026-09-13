@@ -137,6 +137,21 @@ function normalizeDocument(
     nextFollowUpAt: raw.nextFollowUpAt,
     followUpCount: Number(raw.followUpCount || 0),
     slaDays: Number(raw.slaDays || 3),
+    syncSource: raw.syncSource === "google-sheet" ? "google-sheet" : "manual",
+    spreadsheetSyncAt: raw.spreadsheetSyncAt,
+    spreadsheetRow: raw.spreadsheetRow,
+    spreadsheetFingerprint: raw.spreadsheetFingerprint,
+    spreadsheetChangedAt: raw.spreadsheetChangedAt,
+    spreadsheetLastStatus: raw.spreadsheetLastStatus,
+    spreadsheetLastHolder: raw.spreadsheetLastHolder,
+    spreadsheetLastRouteAt: raw.spreadsheetLastRouteAt,
+    automationPriority: raw.automationPriority,
+    automationRecommendation: raw.automationRecommendation,
+    automationReasons: Array.isArray(raw.automationReasons) ? raw.automationReasons : [],
+    automationUpdatedAt: raw.automationUpdatedAt,
+    isDuplicate: raw.isDuplicate === true,
+    duplicateOf: raw.duplicateOf,
+    duplicateDetectedAt: raw.duplicateDetectedAt,
   };
 }
 

@@ -11,6 +11,7 @@ import {
   Printer,
   QrCode,
   RotateCcw,
+  Sparkles,
   ShieldAlert,
   Undo2,
   UserCheck,
@@ -250,6 +251,18 @@ export function DocumentDetails({ user, document, onEdit, notify }: {
           <div><p className="eyebrow">{document.type} ROUTING RECORD</p><h3>{document.requestNo}</h3><p>{document.itemsDescription || document.subjectPurpose || "No description entered"}</p></div>
           <div className="detail-badges"><span className={statusClass(document.status)}>{document.status}</span>{archived && <span className="archive-pill">Archived</span>}</div>
         </div>
+
+        {document.automationRecommendation && (
+          <section className="panel" style={{ marginBottom: 18 }}>
+            <div className="panel-heading">
+              <div><p className="eyebrow">ROUTETRACK AUTO-CHECK</p><h4>Recommended action</h4></div>
+              <Sparkles size={19} />
+            </div>
+            <p>{document.automationRecommendation}</p>
+            {document.automationReasons?.length ? <div className="muted" style={{ display: "grid", gap: 4, marginTop: 8 }}>{document.automationReasons.map((reason, index) => <span key={`${document.id}-reason-${index}`}>• {reason}</span>)}</div> : null}
+            {document.spreadsheetSyncAt && <small className="muted">Latest monitoring data: {formatDateTime(document.spreadsheetSyncAt)}</small>}
+          </section>
+        )}
 
         <div className="document-owner-banner"><UserRound size={19} /><div><span>Recorded by</span><strong>{document.ownerName || document.ownerEmail}</strong><small>{document.ownerEmail}</small></div></div>
 
