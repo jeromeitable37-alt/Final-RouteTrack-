@@ -1,9 +1,10 @@
 "use client";
 
 import { ChangeEvent, useState } from "react";
-import { FileSpreadsheet, Upload, XCircle } from "lucide-react";
+import { FileSpreadsheet, RefreshCw, Upload, XCircle } from "lucide-react";
 import * as XLSX from "xlsx";
 import { addActivityLog, addDocument } from "@/lib/data-service";
+import { auth } from "@/lib/firebase";
 import {
   COPY_TYPES,
   DOCUMENT_STATUSES,
@@ -76,6 +77,8 @@ export function SpreadsheetImportPanel({
   const [filename, setFilename] = useState("");
   const [rows, setRows] = useState<PreviewRow[]>([]);
   const [importing, setImporting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState("");
 
   async function chooseFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -115,6 +118,32 @@ export function SpreadsheetImportPanel({
     } catch {
       setRows([]);
       notify("Unable to read the spreadsheet. Use an XLSX, XLS, or CSV file.", true);
+    }
+  }
+
+  async function syncFromGoogleSheet() {
+    if (!auth?.currentUser) {
+      notify("Please sign in again before synchronizing the spreadsheet.", true);
+      return;
+    }
+    setSyncing(true);
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch("/api/sync/spreadsheet", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        ok?: boolean; created?: number; updated?: number; skipped?: number; error?: string;
+      };
+      if (!response.ok || !result.ok) throw new Error(result.error || "Spreadsheet synchronization failed.");
+      const summary = `${result.created || 0} new · ${result.updated || 0} updated · ${result.skipped || 0} skipped`;
+      setLastSync(new Date().toLocaleString());
+      notify(`Google Sheet synchronized: ${summary}.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Spreadsheet synchronization failed.", true);
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -176,8 +205,9 @@ export function SpreadsheetImportPanel({
 
   return (
     <section className="panel spreadsheet-import-panel">
-      <div className="panel-heading"><div><p className="eyebrow">SPREADSHEET MIGRATION</p><h2>Import old monitoring records</h2></div><FileSpreadsheet size={21} /></div>
-      <p className="muted">Supported files: XLSX, XLS, and CSV. The importer recognizes common columns such as Type, Document Number, Date Requested, Supplier, Amount, Current Holder, and Status.</p>
+      <div className="panel-heading"><div><p className="eyebrow">AUTOMATIC MONITORING</p><h2>Google Sheets synchronization</h2><p className="muted">RouteTrack checks the shared monitoring spreadsheet every 15 minutes and matches records by document type and number.</p>{lastSync && <small className="muted">Last manual sync: {lastSync}</small>}</div><RefreshCw size={21} /></div>
+      <div className="import-summary"><span><FileSpreadsheet size={15} /> Miss Leah's monitoring sheet</span><button className="primary-button" disabled={syncing} onClick={() => void syncFromGoogleSheet()}><RefreshCw size={16} className={syncing ? "spin" : ""} /> {syncing ? "Syncing…" : "Sync spreadsheet now"}</button></div>
+      <p className="muted">Automatic sync uses the Google Sheet configured for RouteTrack. You can still upload XLSX, XLS, or CSV files below for one-time migrations. Supported files: XLSX, XLS, and CSV. The importer recognizes common columns such as Type, Document Number, Date Requested, Supplier, Amount, Current Holder, and Status.</p>
       <label className="spreadsheet-dropzone">
         <Upload size={24} />
         <span><strong>{filename || "Choose a spreadsheet"}</strong><small>Maximum preview: 500 rows</small></span>

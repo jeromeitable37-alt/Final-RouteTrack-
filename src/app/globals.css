@@ -2234,3 +2234,9 @@ html[data-theme="dark"] .professional-profile-title > p:not(.profile-hero-kicker
     padding: 14px;
   }
 }
+
+.spin { animation: routetrack-spin 0.9s linear infinite; }
+@keyframes routetrack-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.spin { animation: routetrack-spin 0.9s linear infinite; }
+@keyframes routetrack-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

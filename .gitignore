@@ -27,4 +27,9 @@ next-env.d.ts
 .env*.local
 .env.local.backup-*
 *-firebase-adminsdk-*.json
-Create-Final-RouteTrack-Env.ps1
+Create-Final-RouteTrack-Env.ps1oracleJdk-26/
+node_modules/
+.next/
+oracleJdk-26/
+node_modules/
+.next/

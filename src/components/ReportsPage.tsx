@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { BarChart3, Download, Filter, Timer, TrendingUp } from "lucide-react";
 import { DOCUMENT_STATUSES, DOCUMENT_TYPES, DocumentRecord, SessionUser } from "@/lib/types";
 import { SpreadsheetImportPanel } from "./SpreadsheetImportPanel";
+import { GoogleSheetSyncPanel } from "./GoogleSheetSyncPanel";
 import { csvDownload, formatCurrency } from "@/lib/utils";
 
 function normalize(value: unknown): string {
@@ -118,6 +119,8 @@ export function ReportsPage({
           </div>
         </article>
       </section>
+
+      {user.role === "admin" && <GoogleSheetSyncPanel user={user} notify={notify} />}
 
       <SpreadsheetImportPanel user={user} existingDocuments={documents} notify={notify} />
 
