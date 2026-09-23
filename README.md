@@ -1,5 +1,7 @@
 # RouteTrack — PRF & SRF Monitoring System with Admin Control
 
+[![RouteTrack spreadsheet sync](https://github.com/jeromeitable37-alt/Final-RouteTrack-/actions/workflows/routetrack-spreadsheet-sync.yml/badge.svg)](https://github.com/jeromeitable37-alt/Final-RouteTrack-/actions/workflows/routetrack-spreadsheet-sync.yml)
+
 A mobile-friendly document control system for logging PRF and SRF files, recording every handoff, locating the current holder, and identifying missing, overdue, or duplicate records.
 
 ## Account roles
@@ -110,7 +112,6 @@ The old data is left untouched as a backup.
 
 Publish the updated `firestore.rules` before using the administrator features. The interface alone is not a security control; Firestore rules enforce which records each role can access.
 
-
 ## Student Assistant Routing Workflow
 
 1. Add the PRF, CRF, or SRF before releasing the physical document.
@@ -119,7 +120,6 @@ Publish the updated `firestore.rules` before using the administrator features. T
 4. Use **My Routing Log** to see the latest holder and handoff date.
 5. Open any item to see the complete chain of custody.
 6. Export the routing log to CSV when a printed or backup report is needed.
-
 
 ## CRF edit fix
 
