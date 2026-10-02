@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./ui-enhancements.css";
+import "./branding-overrides.css";
 import { PwaRegister } from "@/components/PwaSupport";
 
 export const metadata: Metadata = {
