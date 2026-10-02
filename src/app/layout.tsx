@@ -4,14 +4,13 @@ import "./ui-enhancements.css";
 import { PwaRegister } from "@/components/PwaSupport";
 
 export const metadata: Metadata = {
-  title: "RouteTrack — PRF, SRF, CRF and PO Monitoring",
-  description:
-    "Mobile-friendly document routing and chain-of-custody monitoring for student assistants.",
-  applicationName: "RouteTrack",
+  title: "Purchasing Monitoring — SISC",
+  description: "Professional purchasing document routing and monitoring for Southville International School and Colleges.",
+  applicationName: "Purchasing Monitoring",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#174f7c",
+  themeColor: "#5b2a86",
   width: "device-width",
   initialScale: 1,
 };
@@ -21,12 +20,7 @@ const themeInitializationScript = `
     try {
       const saved = localStorage.getItem("routetrack-theme");
       const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      const theme = saved === "dark" || saved === "light"
-        ? saved
-        : systemDark
-          ? "dark"
-          : "light";
-
+      const theme = saved === "dark" || saved === "light" ? saved : systemDark ? "dark" : "light";
       document.documentElement.dataset.theme = theme;
       document.documentElement.style.colorScheme = theme;
     } catch (_) {
@@ -35,20 +29,11 @@ const themeInitializationScript = `
   })();
 `;
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{ __html: themeInitializationScript }}
-        />
-      </head>
-      <body>
-        <PwaRegister />
-        {children}
-      </body>
+      <head><script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} /></head>
+      <body><PwaRegister />{children}</body>
     </html>
   );
 }
