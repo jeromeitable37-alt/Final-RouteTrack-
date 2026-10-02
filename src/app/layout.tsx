@@ -3,6 +3,7 @@ import "./globals.css";
 import "./ui-enhancements.css";
 import "./branding-overrides.css";
 import "./purchasing-reference-ui.css";
+import "./theme-fixes.css";
 import { PwaRegister } from "@/components/PwaSupport";
 
 export const metadata: Metadata = {
