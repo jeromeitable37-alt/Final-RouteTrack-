@@ -1,0 +1,6 @@
+/* Final institutional branding pass */
+.brand strong{font-size:0!important}
+.brand strong::after{content:'Purchasing Monitoring';font-size:15px;letter-spacing:-.01em}
+.brand span{font-size:10px!important;opacity:.72}
+.auth-brand-panel .eyebrow{letter-spacing:.12em}
+.auth-brand-panel h1{max-width:620px}
