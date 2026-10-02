@@ -1,0 +1,198 @@
+/* RouteTrack final theme / contrast fixes */
+
+/* ---------- Shared readable design tokens ---------- */
+:root{
+  --rt-bg:#f4f7f7;
+  --rt-surface:#ffffff;
+  --rt-surface-2:#f8fbfa;
+  --rt-text:#15272a;
+  --rt-text-2:#43575b;
+  --rt-muted:#6b7c80;
+  --rt-border:#dce6e6;
+  --rt-input:#ffffff;
+  --rt-input-text:#15272a;
+  --rt-input-placeholder:#7b8b8f;
+  --rt-sidebar:#063a2f;
+  --rt-sidebar-2:#032a23;
+  --rt-sidebar-text:#e9f5f1;
+  --rt-sidebar-muted:#a8c9c0;
+  --rt-green:#087553;
+  --rt-green-soft:#e5f5ef;
+  --rt-focus:#159b6f;
+}
+
+html[data-theme="dark"]{
+  --rt-bg:#0b1715;
+  --rt-surface:#11221f;
+  --rt-surface-2:#162a26;
+  --rt-text:#edf7f4;
+  --rt-text-2:#c5d8d3;
+  --rt-muted:#9bb1ab;
+  --rt-border:#29423d;
+  --rt-input:#0d1d1a;
+  --rt-input-text:#f2faf7;
+  --rt-input-placeholder:#8da59e;
+  --rt-sidebar:#041f19;
+  --rt-sidebar-2:#02150f;
+  --rt-sidebar-text:#eefaf6;
+  --rt-sidebar-muted:#9fc2b8;
+  --rt-green:#35b887;
+  --rt-green-soft:#15382e;
+  --rt-focus:#35c997;
+}
+
+html,body{background:var(--rt-bg)!important;color:var(--rt-text)!important}
+.app-layout,.main-content{background:var(--rt-bg)!important;color:var(--rt-text)!important}
+
+/* ---------- Sidebar: SISC logo + Purchasing Monitoring ---------- */
+.sidebar{
+  background:linear-gradient(180deg,var(--rt-sidebar) 0%,var(--rt-sidebar-2) 100%)!important;
+  color:var(--rt-sidebar-text)!important;
+  border-right:1px solid rgba(255,255,255,.08)!important;
+}
+.brand{
+  min-height:118px!important;
+  grid-template-columns:70px minmax(0,1fr)!important;
+  column-gap:12px!important;
+  padding:4px 9px 18px!important;
+  align-items:center!important;
+}
+.brand-icon{
+  grid-row:1/3!important;
+  width:66px!important;
+  height:84px!important;
+  padding:4px!important;
+  border-radius:6px!important;
+  background:#fff url('/sisc-logo.svg') center/contain no-repeat!important;
+  border:1px solid rgba(255,255,255,.18)!important;
+  box-shadow:0 6px 18px rgba(0,0,0,.16)!important;
+}
+.brand-icon svg{display:none!important}
+.brand strong{font-size:0!important;color:#fff!important;line-height:1.12!important}
+.brand strong::after{
+  content:'SOUTHVILLE INTERNATIONAL SCHOOL AND COLLEGES';
+  display:block;
+  font-size:14px!important;
+  font-weight:800!important;
+  line-height:1.18!important;
+  letter-spacing:-.01em;
+}
+.brand span{font-size:0!important;color:var(--rt-sidebar-muted)!important;margin-top:7px!important}
+.brand span::after{
+  content:'Purchasing Monitoring';
+  font-size:17px!important;
+  font-weight:600!important;
+  line-height:1.2!important;
+}
+
+.sidebar nav button{color:var(--rt-sidebar-text)!important}
+.sidebar nav button:hover{background:rgba(255,255,255,.08)!important;color:#fff!important}
+.sidebar nav button.active{
+  background:linear-gradient(90deg,#087553,#0b8a64)!important;
+  color:#fff!important;
+  box-shadow:inset 3px 0 #72d4b1,0 7px 18px rgba(0,0,0,.14)!important;
+}
+.sidebar nav button>span{color:#eafaf5!important;background:rgba(255,255,255,.12)!important}
+.admin-sidebar-badge{color:#dff5ed!important;background:rgba(255,255,255,.08)!important;border-color:rgba(255,255,255,.12)!important}
+.user-card{color:#fff!important}
+.user-card strong{color:#fff!important}
+.user-card span{color:var(--rt-sidebar-muted)!important}
+.logout-button{color:#cce2dc!important}
+.logout-button:hover{color:#fff!important;background:rgba(255,255,255,.08)!important}
+
+/* ---------- Top bar ---------- */
+.topbar{background:color-mix(in srgb,var(--rt-surface) 94%,transparent)!important;border-bottom:1px solid var(--rt-border)!important;color:var(--rt-text)!important}
+.topbar-title h1{color:var(--rt-text)!important}
+.topbar-title .eyebrow{color:var(--rt-green)!important}
+
+/* ---------- Every input/select/textarea: correct text in both modes ---------- */
+input,select,textarea,
+.stack-form input,.document-form input,.document-form select,.document-form textarea,
+.filter-row select,.search-box input,
+.user-toolbar input,.finder-search input{
+  background:var(--rt-input)!important;
+  color:var(--rt-input-text)!important;
+  -webkit-text-fill-color:var(--rt-input-text)!important;
+  border-color:var(--rt-border)!important;
+  caret-color:var(--rt-focus)!important;
+}
+input::placeholder,textarea::placeholder,.search-box input::placeholder{
+  color:var(--rt-input-placeholder)!important;
+  opacity:1!important;
+  -webkit-text-fill-color:var(--rt-input-placeholder)!important;
+}
+input:focus,select:focus,textarea:focus,.search-box:focus-within{
+  border-color:var(--rt-focus)!important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--rt-focus) 16%,transparent)!important;
+}
+select option{background:var(--rt-input)!important;color:var(--rt-input-text)!important}
+
+/* Search boxes and command palette */
+.search-box{background:var(--rt-input)!important;border-color:var(--rt-border)!important;color:var(--rt-text)!important}
+.search-box svg{color:var(--rt-muted)!important;flex:none}
+
+/* ---------- Cards, tables and text ---------- */
+.panel,.metric-card,.modal-card,.alert-card,.daily-summary-strip,.backup-reminder,.quick-action-panel,.auth-form-card{
+  background:var(--rt-surface)!important;
+  color:var(--rt-text)!important;
+  border-color:var(--rt-border)!important;
+}
+.panel-heading h2,.section-heading h3,.metric-card strong,.finder-heading h2,
+.table-wrap td strong,.modal-header h2,.detail-title-row h3,.detail-grid strong,
+.current-location strong,.remarks-box p,.user-card strong{color:var(--rt-text)!important}
+.metric-card>span,.metric-card p,.muted,.table-wrap td>span,.table-wrap th,.table-footer,
+.panel-heading>span,.section-heading>span{color:var(--rt-muted)!important}
+.table-wrap th{background:var(--rt-surface)!important;border-color:var(--rt-border)!important}
+.table-wrap td{border-color:color-mix(in srgb,var(--rt-border) 70%,transparent)!important;color:var(--rt-text-2)!important}
+.table-wrap tbody tr:hover{background:var(--rt-surface-2)!important}
+
+/* Reference dashboard components */
+.pm-card,.pm-kpi{background:var(--rt-surface)!important;border-color:var(--rt-border)!important;color:var(--rt-text)!important}
+.pm-card-heading h3,.pm-kpi strong,.pm-route-stage-wrap strong,.pm-route-stage-wrap>span,
+.pm-table td strong,.pm-office-list strong,.pm-activity-list strong,.pm-alert-list button>span:nth-child(2){color:var(--rt-text)!important}
+.pm-card-heading p,.pm-kpi>span,.pm-table th,.pm-table td,.pm-office-list em,.pm-activity-list small,.pm-activity-list time,.pm-alert-list time{color:var(--rt-muted)!important}
+.pm-card-heading select{background:var(--rt-input)!important;color:var(--rt-input-text)!important;border-color:var(--rt-border)!important}
+.pm-table th{background:var(--rt-surface-2)!important;border-color:var(--rt-border)!important}
+.pm-table td{border-color:var(--rt-border)!important}
+.pm-office-list button:hover,.pm-activity-list button:hover,.pm-alert-list button:hover{background:var(--rt-surface-2)!important}
+
+/* ---------- Dark mode: no leftover light-mode text ---------- */
+html[data-theme="dark"] .main-content,
+html[data-theme="dark"] .page-section{color:var(--rt-text)!important}
+html[data-theme="dark"] .topbar{background:rgba(17,34,31,.96)!important}
+html[data-theme="dark"] .topbar-actions .icon-button,
+html[data-theme="dark"] .theme-toggle{background:#18332e!important;color:#e9f7f3!important;border-color:#315049!important}
+html[data-theme="dark"] .secondary-button{background:#162a26!important;color:#e9f7f3!important;border-color:#34514a!important}
+html[data-theme="dark"] .secondary-button:hover{background:#1d3731!important}
+html[data-theme="dark"] .icon-button{background:#18332e!important;color:#e9f7f3!important}
+html[data-theme="dark"] .filter-row{background:rgba(17,34,31,.78)!important;border-color:var(--rt-border)!important}
+html[data-theme="dark"] .status-in-transit,html[data-theme="dark"] .status-for-approval{background:#173a50!important;color:#9fd5f4!important}
+html[data-theme="dark"] .status-completed{background:#15382e!important;color:#70d8ad!important}
+html[data-theme="dark"] .status-missing,html[data-theme="dark"] .status-cancelled{background:#422326!important;color:#ff9c9c!important}
+html[data-theme="dark"] .status-returned-for-correction{background:#44351d!important;color:#ffd17a!important}
+html[data-theme="dark"] .current-location{background:#15382e!important;border-color:#285e4e!important;color:#71d9b1!important}
+html[data-theme="dark"] .detail-grid div,.detail-grid div{background:var(--rt-surface-2)!important;border-color:var(--rt-border)!important}
+html[data-theme="dark"] .loading-panel,html[data-theme="dark"] .empty-panel{background:var(--rt-surface-2)!important;border-color:var(--rt-border)!important;color:var(--rt-muted)!important}
+html[data-theme="dark"] .modal-header{background:var(--rt-surface)!important;border-color:var(--rt-border)!important}
+html[data-theme="dark"] .toast{background:#16372e!important;color:#effbf7!important}
+
+/* Fix elements that were using hard-coded dark text */
+.pm-welcome-copy h2,.pm-date-block,.pm-date-block span,.pm-card-heading h3,
+.pm-route-stage-wrap strong,.pm-route-stage-wrap>span,.pm-kpi strong,.pm-kpi>span,
+.pm-table td,.pm-table td strong,.pm-office-list strong,.pm-activity-list strong,
+.pm-alert-list button>span:nth-child(2){color:var(--rt-text)!important}
+.pm-welcome-copy p,.pm-card-heading p,.pm-kpi small,.pm-legend,.pm-bar-day small{color:var(--rt-muted)!important}
+
+/* AI card logo should use the SISC mark, not a generic icon */
+.pm-ai-logo{background:#fff url('/sisc-logo.svg') center/contain no-repeat!important;border-radius:8px!important}
+.pm-ai-logo svg{display:none!important}
+
+/* Keep the logo crisp and never stretch it */
+img[src*="sisc-logo"]{object-fit:contain!important;object-position:center!important}
+
+@media(max-width:760px){
+  .brand{grid-template-columns:58px minmax(0,1fr)!important;min-height:105px!important}
+  .brand-icon{width:56px!important;height:74px!important}
+  .brand strong::after{font-size:13px!important}
+  .brand span::after{font-size:15px!important}
+}
