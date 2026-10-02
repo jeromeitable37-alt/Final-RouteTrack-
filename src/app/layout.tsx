@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./ui-enhancements.css";
 import "./branding-overrides.css";
+import "./purchasing-reference-ui.css";
 import { PwaRegister } from "@/components/PwaSupport";
 
 export const metadata: Metadata = {
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#5b2a86",
+  themeColor: "#07543f",
   width: "device-width",
   initialScale: 1,
 };
